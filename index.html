@@ -10,15 +10,19 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
 </head>
-<body class="bg-slate-50">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
         const CATEGORIES = {
-            "餐廳": ["廚師帽子"], "咖啡廳": ["咖啡杯"], "甜點店": ["甜點店"], "電影院": ["爆米花"],
+            "餐廳": ["廚師帽子"], "咖啡廳": ["咖啡杯"], "甜點店": ["馬卡龍", "甜甜圈"], "電影院": ["爆米花"],
             "藥局": ["牙刷"], "動物園": ["蒲公英"], "森林": ["橡栗"], "水邊": ["擬餌"],
             "郵局": ["郵票"], "美術館": ["畫框"], "車站": ["電車紙模型"], "海灘": ["貝殼"],
             "漢堡店": ["漢堡"], "便利商店": ["瓶蓋"], "超市": ["蘑菇"], "麵包店": ["法國麵包"],
@@ -30,8 +34,8 @@
 
         const App = () => {
             const [locations, setLocations] = useState([]);
-            const [formData, setFormData] = useState({ lat: "", lng: "", date: new Date().toISOString().split('T')[0], region: "", records: [] });
             const [editIdx, setEditIdx] = useState(null);
+            const [formData, setFormData] = useState({ lat: "", lng: "", region: "", date: new Date().toISOString().split('T')[0], records: [{ cat: "餐廳", sub: "廚師帽子", counts: {} }] });
 
             useEffect(() => {
                 localforage.config({ name: 'PikminData' });
@@ -45,14 +49,16 @@
                 else list.push(formData);
                 await localforage.setItem('data', list);
                 setLocations(list);
-                setFormData({ lat: "", lng: "", date: new Date().toISOString().split('T')[0], region: "", records: [] });
+                setFormData({ lat: "", lng: "", region: "", date: new Date().toISOString().split('T')[0], records: [{ cat: "餐廳", sub: "廚師帽子", counts: {} }] });
                 setEditIdx(null);
             };
 
             return (
                 <div className="max-w-3xl mx-auto p-4">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm mb-6">
-                        <h2 className="text-xl font-black mb-4">{editIdx !== null ? "編輯紀錄" : "新增紀錄"}</h2>
+                    <h1 className="text-2xl font-black mb-6 text-emerald-800">📋 盆栽收成記錄器</h1>
+                    
+                    {/* 表單區 */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             <input placeholder="緯度" className="p-2 border rounded" value={formData.lat} onChange={e=>setFormData({...formData, lat: e.target.value})}/>
                             <input placeholder="經度" className="p-2 border rounded" value={formData.lng} onChange={e=>setFormData({...formData, lng: e.target.value})}/>
@@ -61,21 +67,32 @@
                         
                         {formData.records.map((r, i) => (
                             <div key={i} className="bg-slate-50 p-3 rounded-lg mb-2">
-                                <select className="w-full mb-2 p-1 border rounded" value={r.cat} onChange={e => {
-                                    let newRecs = [...formData.records];
-                                    newRecs[i] = { cat: e.target.value, sub: CATEGORIES[e.target.value][0], counts: {} };
-                                    setFormData({...formData, records: newRecs});
-                                }}>
-                                    {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                <div className="flex gap-2 mb-2">
+                                    <select className="w-1/2 p-1 border rounded" value={r.cat} onChange={e => {
+                                        let nr = [...formData.records];
+                                        nr[i] = { cat: e.target.value, sub: CATEGORIES[e.target.value][0], counts: {} };
+                                        setFormData({...formData, records: nr});
+                                    }}>
+                                        {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    {r.cat !== "路邊" && (
+                                        <select className="w-1/2 p-1 border rounded" value={r.sub} onChange={e => {
+                                            let nr = [...formData.records];
+                                            nr[i].sub = e.target.value;
+                                            setFormData({...formData, records: nr});
+                                        }}>
+                                            {CATEGORIES[r.cat].map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                                        </select>
+                                    )}
+                                </div>
                                 <div className="grid grid-cols-4 gap-1">
-                                    {COLORS.map(color => (
-                                        <div key={color} className="text-center">
-                                            <div className="text-[10px]">{color}</div>
-                                            <input type="number" className="w-full border rounded text-center" value={r.counts[color]||0} onChange={e => {
-                                                let newRecs = [...formData.records];
-                                                newRecs[i].counts[color] = parseInt(e.target.value)||0;
-                                                setFormData({...formData, records: newRecs});
+                                    {COLORS.map(c => (
+                                        <div key={c} className="text-center">
+                                            <div className="text-[10px]">{c}</div>
+                                            <input type="number" className="w-full border rounded text-center text-sm" value={r.counts[c]||0} onChange={e => {
+                                                let nr = [...formData.records];
+                                                nr[i].counts[c] = parseInt(e.target.value)||0;
+                                                setFormData({...formData, records: nr});
                                             }}/>
                                         </div>
                                     ))}
@@ -86,6 +103,7 @@
                         <button onClick={save} className="w-full py-3 bg-emerald-600 text-white font-black rounded-xl">儲存</button>
                     </div>
 
+                    {/* 列表區 */}
                     <div className="space-y-4">
                         {locations.map((loc, idx) => (
                             <div key={idx} className="bg-white p-4 rounded-xl shadow border">
@@ -93,7 +111,6 @@
                                     <h3 className="font-bold text-lg">{loc.region || "未知地點"}</h3>
                                     <button onClick={() => { setEditIdx(idx); setFormData(loc); }} className="text-emerald-600 text-sm font-bold">編輯</button>
                                 </div>
-                                <p className="text-xs text-slate-400 font-mono mb-2">{loc.lat}, {loc.lng}</p>
                                 <div className="text-sm">日期: {loc.date}</div>
                                 {loc.records.map((r, i) => (
                                     <div key={i} className="text-sm text-emerald-800 font-bold">
