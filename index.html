@@ -52,7 +52,13 @@
             { id: 'ice', label: '冰', bg: 'bg-cyan-300', text: 'text-cyan-900' }
         ];
 
-        const getEmptyColors = () => ({ red: 0, yellow: 0, blue: 0, purple: 0, white: 0, pink: 0, rock: 0, ice: 0 });
+        const getEmptyColors = () => ({ 紅: 0, 黃: 0, 藍: 0, 紫: 0, 白: 0, 粉: 0, 岩: 0, 冰: 0 });
+
+        const formatDateTime = (isoString) => {
+            if (!isoString) return "無紀錄";
+            const d = new Date(isoString);
+            return isNaN(d.getTime()) ? "無紀錄" : `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        };
 
         const ColorCounter = ({ color, count, onChange, disabled }) => (
             <div className={`flex flex-col items-center justify-between p-1.5 rounded-lg ${color.bg} ${color.text} ${color.border || 'border border-transparent'} shadow-sm min-w-[3.5rem]`}>
@@ -87,13 +93,14 @@
 
         const App = () => {
             const [locations, setLocations] = useState([]);
+            const [isInitialLoading, setIsInitialLoading] = useState(true);
             const [isAdmin, setIsAdmin] = useState(false);
             const [lat, setLat] = useState("");
             const [lng, setLng] = useState("");
             const [region, setRegion] = useState("");
             const [customName, setCustomName] = useState("");
             const [visitDate, setVisitDate] = useState(new Date().toISOString().slice(0, 10));
-            const [records, setRecords] = useState([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]);
+            const [records, setRecords] = useState([{ id: Date.now(), cat: "餐廳", sub: "廚師帽子", counts: getEmptyColors() }]);
             const [editingVisitId, setEditingVisitId] = useState(null);
             const [expandedLocs, setExpandedLocs] = useState(new Set());
 
@@ -101,64 +108,69 @@
                 localforage.config({ name: 'PikminHarvestTracker' });
                 localforage.getItem('pikmin-seedlings').then(saved => saved && setLocations(saved));
                 if (sessionStorage.getItem('pikmin-admin-auth') === 'true') setIsAdmin(true);
+                setIsInitialLoading(false);
             }, []);
 
             const handleSave = async () => {
                 if (!isAdmin) return;
-                if (!lat || !lng || !visitDate) return alert("座標與日期必填");
                 const locKey = `${parseFloat(lat).toFixed(5)},${parseFloat(lng).toFixed(5)}`;
                 let existingLocs = [...locations];
                 let locIndex = existingLocs.findIndex(l => l.key === locKey);
                 const newVisit = { id: editingVisitId || Date.now().toString(), date: visitDate, records };
+
                 if (locIndex >= 0) {
                     if (editingVisitId) existingLocs[locIndex].visits = existingLocs[locIndex].visits.map(v => v.id === editingVisitId ? newVisit : v);
                     else existingLocs[locIndex].visits.push(newVisit);
                     existingLocs[locIndex].visits.sort((a,b) => b.date.localeCompare(a.date));
-                    existingLocs[locIndex].region = region;
+                    existingLocs[locIndex].region = region || existingLocs[locIndex].region;
                     existingLocs[locIndex].customName = customName;
                 } else {
                     existingLocs.push({ key: locKey, lat, lng, region, customName, targetCategory: "餐廳", visits: [newVisit] });
                 }
+                
                 await localforage.setItem('pikmin-seedlings', existingLocs);
                 setLocations(existingLocs);
-                setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]);
+                setRecords([{ id: Date.now(), cat: "餐廳", sub: "廚師帽子", counts: getEmptyColors() }]);
                 setEditingVisitId(null); setLat(""); setLng(""); setRegion(""); setCustomName("");
                 alert("💾 儲存成功！");
             };
 
+            if (isInitialLoading) return <div className="min-h-screen flex items-center justify-center text-emerald-600 font-bold bg-slate-50">載入中...</div>;
+
             return (
-                <div className="min-h-screen bg-slate-50">
-                    <header className="bg-emerald-600 text-white shadow-lg sticky top-0 z-30">
-                        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-                            <h1 className="text-xl font-bold">Pikmin 盆栽收成記錄器</h1>
-                            <button onClick={() => { if(isAdmin){ setIsAdmin(false); sessionStorage.removeItem('pikmin-admin-auth'); } else { const p = prompt("密碼:"); if(p==ADMIN_PASSWORD){ setIsAdmin(true); sessionStorage.setItem('pikmin-admin-auth', 'true'); } }}} className="bg-emerald-800 px-3 py-1 rounded text-xs font-bold">
-                                {isAdmin ? "🔓 管理模式" : "🔒 訪客模式"}
-                            </button>
-                        </div>
+                <div className="max-w-5xl mx-auto p-4">
+                    <header className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+                        <h1 className="font-black text-xl">Pikmin 盆栽收成記錄器</h1>
+                        <button onClick={() => { if(isAdmin){ setIsAdmin(false); sessionStorage.removeItem('pikmin-admin-auth'); } else { const p = prompt("密碼:"); if(p==ADMIN_PASSWORD){ setIsAdmin(true); sessionStorage.setItem('pikmin-admin-auth', 'true'); } }}} className="text-xs bg-black/20 px-3 py-1 rounded-full">{isAdmin ? "🔓 管理模式" : "🔒 訪客模式"}</button>
                     </header>
 
-                    <main className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         {isAdmin && (
                             <div className="lg:col-span-5 bg-white p-6 rounded-2xl border shadow-sm">
-                                <h2 className="font-black mb-4">{editingVisitId ? "修改" : "新增"}</h2>
+                                <h2 className="font-black mb-4">{editingVisitId ? "修改紀錄" : "新增紀錄"}</h2>
                                 <div className="grid grid-cols-2 gap-2 mb-2">
                                     <input placeholder="緯度" className="p-2 border rounded text-sm" value={lat} onChange={e=>setLat(e.target.value)}/>
                                     <input placeholder="經度" className="p-2 border rounded text-sm" value={lng} onChange={e=>setLng(e.target.value)}/>
                                 </div>
-                                <button onClick={async()=>{try{const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}`); const d=await r.json(); setRegion([d.principalSubdivision, d.locality].filter(Boolean).join(" "));}catch(e){}}} className="w-full bg-slate-200 py-1 mb-2 text-xs rounded">解析地區</button>
+                                <button onClick={async()=>{try{const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=zh-tw`); const d=await r.json(); setRegion([d.principalSubdivision, d.locality].filter(Boolean).join(" "));}catch(e){}}} className="w-full bg-slate-200 py-1 mb-2 text-xs rounded">解析地區</button>
                                 <input placeholder="自訂地點名稱" className="w-full p-2 border rounded mb-2 text-sm" value={customName} onChange={e=>setCustomName(e.target.value)}/>
                                 <input type="date" className="w-full p-2 border rounded mb-4" value={visitDate} onChange={e=>setVisitDate(e.target.value)}/>
+                                
                                 {records.map((r, i) => (
                                     <div key={r.id} className="bg-slate-50 p-3 rounded-lg mb-2">
-                                        <select className="w-full mb-2 p-1 border rounded text-sm" value={r.cat} onChange={e => { let n=[...records]; n[i]={...n[i], cat:e.target.value, sub:CATEGORIES[e.target.value][0]}; setRecords(n); }}>
-                                            {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                        <div className="flex gap-2 mb-2">
+                                            <select className="w-1/2 p-1 border rounded text-sm" value={r.cat} onChange={e => { let n=[...records]; n[i]={...n[i], cat:e.target.value, sub:CATEGORIES[e.target.value][0]}; setRecords(n); }}>
+                                                {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                            {r.cat !== "路邊" && <select className="w-1/2 p-1 border rounded text-sm" value={r.sub} onChange={e => { let n=[...records]; n[i].sub=e.target.value; setRecords(n); }}>{CATEGORIES[r.cat].map(sc => <option key={sc} value={sc}>{sc}</option>)}</select>}
+                                        </div>
                                         <div className="grid grid-cols-4 gap-1">
-                                            {COLORS.map(c => <div key={c.id}><div className="text-[10px] text-center">{c.label}</div><input type="number" className="w-full border rounded text-center text-sm" value={r.counts[c.label]||0} onChange={e=>{let n=[...records]; n[i].counts[c.label]=parseInt(e.target.value)||0; setRecords(n);}}/></div>)}
+                                            {COLORS.map(c => <ColorCounter key={c.id} color={c} count={(r.counts && r.counts[c.label])||0} onChange={val=>{let n=[...records]; if(!n[i].counts) n[i].counts=getEmptyColors(); n[i].counts[c.label]=val; setRecords(n);}}/>)}
                                         </div>
                                     </div>
                                 ))}
-                                <button onClick={handleSave} className="w-full py-3 bg-emerald-600 text-white font-black rounded-xl mt-4">儲存紀錄</button>
+                                <button onClick={() => setRecords([...records, { id: Date.now(), cat: "餐廳", sub: "廚師帽子", counts: getEmptyColors() }])} className="w-full py-2 bg-slate-200 rounded mb-4 text-xs font-bold">+ 新增類別</button>
+                                <button onClick={handleSave} className="w-full py-3 bg-emerald-600 text-white font-black rounded-xl">儲存</button>
                             </div>
                         )}
 
@@ -168,22 +180,26 @@
                                     <div className="flex justify-between items-center cursor-pointer" onClick={() => {const n=new Set(expandedLocs); if(n.has(loc.key)) n.delete(loc.key); else n.add(loc.key); setExpandedLocs(n);}}>
                                         <div>
                                             <h2 className="font-black text-lg">{loc.customName || loc.region || "未知地點"} <TargetLocalClock lat={loc.lat} lng={loc.lng} /></h2>
-                                            <p className="text-[10px] text-slate-400 font-mono">{loc.lat}, {loc.lng}</p>
+                                            <div className="text-xs text-slate-400 font-mono">{loc.lat}, {loc.lng}</div>
+                                            <div className="mt-1 text-[10px] bg-amber-500 text-white inline-block px-1 rounded">🎯 目標: {loc.targetCategory||"餐廳"}</div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-xs font-bold text-emerald-600">🎯 {loc.targetCategory||"餐廳"}</div>
-                                            <div className="text-sm font-black">{loc.visits.reduce((acc, v)=>acc+v.records.reduce((a,r)=>a+Object.values(r.counts).reduce((x,y)=>x+y,0),0),0)} 盆</div>
+                                            <div className="text-sm font-black">{loc.visits.reduce((acc, v)=>acc+v.records.reduce((a,r)=>a+Object.values(r.counts||{}).reduce((x,y)=>x+y,0),0),0)} 盆</div>
                                         </div>
                                     </div>
+                                    
                                     {expandedLocs.has(loc.key) && loc.visits.map(v => (
-                                        <div key={v.id} className="mt-4 pt-4 border-t border-slate-100">
+                                        <div key={v.id} className="mt-4 pt-4 border-t">
                                             <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
                                                 <span>{v.date}</span>
-                                                {/* 計算該日期下，目標種類的總盆數 */}
-                                                <span>目標數: {v.records.filter(r=>r.cat===(loc.targetCategory||"餐廳")).reduce((a,r)=>a+Object.values(r.counts).reduce((x,y)=>x+y,0), 0)}</span>
+                                                <span>目標數: {v.records.filter(r=>r.cat===(loc.targetCategory||"餐廳")).reduce((a,r)=>a+Object.values(r.counts||{}).reduce((x,y)=>x+y,0), 0)}</span>
                                             </div>
-                                            {v.records.map((r, i) => <div key={i} className="text-sm font-bold text-slate-700">{r.cat}: {Object.entries(r.counts).filter(([_,v])=>v>0).map(([k,v]) => `${k}${v}`).join(' ')}</div>)}
-                                            {isAdmin && <button onClick={() => { setLat(loc.lat); setLng(loc.lng); setRegion(loc.region); setVisitDate(v.date); setEditingVisitId(v.id); setRecords(v.records); }} className="text-emerald-600 text-xs font-bold mt-2 hover:underline">編輯</button>}
+                                            {v.records.map((r, i) => (
+                                                <div key={i} className="text-sm text-slate-700 font-bold mb-1">
+                                                    {r.cat}: {Object.entries(r.counts || {}).filter(([_,c])=>c>0).map(([k,c]) => `${k}${c}`).join(' ')}
+                                                </div>
+                                            ))}
+                                            {isAdmin && <button onClick={() => { setLat(loc.lat); setLng(loc.lng); setRegion(loc.region); setCustomName(loc.customName); setVisitDate(v.date); setEditingVisitId(v.id); setRecords(v.records); window.scrollTo({top:0, behavior:'smooth'}); }} className="text-emerald-600 text-xs font-bold mt-2 hover:underline">編輯</button>}
                                         </div>
                                     ))}
                                 </div>
