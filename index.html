@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pikmin 盆栽收成記錄器</title>
+    <title>Pikmin bloom 盆栽收成記錄器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -37,7 +37,7 @@
             "麵包店": ["法國麵包"], "美容院": ["剪刀"], "服飾店": ["髮圈"], "公園": ["幸運草", "四葉幸運草"],
             "圖書館": ["迷你書"], "路邊": ["路邊"], "壽司餐廳": ["壽司"],
             "山丘": ["山丘別針徽章"], "體育館": ["體育館鑰匙圈"], "五金行": ["工具"], "公車站": ["公車紙模型"],
-            "化妝品商店": ["化妝品"], "義式餐廳": ["披薩", "義大利麵"], "咖哩餐廳": ["一碗哩"],
+            "化妝品商店": ["化妝品"], "義式餐廳": ["披薩", "義大利麵"], "咖哩餐廳": ["一碗咖哩"],
             "飯店": ["飯店備品"], "主題樂園": ["主題樂園門票"], "墨西哥餐廳": ["塔可餅"], "橋樑": ["橋樑別針"],
             "神社和寺廟": ["大吉", "吉", "末吉"], "洗衣店": ["洗衣用品"], "拉麵店": ["拉麵鑰匙圈"],
             "學校": ["校徽胸針"], "電器行": ["電池", "仙女燈"], "韓國餐廳": ["韓國泡菜"], "起司店": ["起司"],
@@ -56,6 +56,16 @@
         ];
 
         const getEmptyColors = () => ({ red: 0, yellow: 0, blue: 0, purple: 0, white: 0, pink: 0, rock: 0, ice: 0 });
+
+        // ★ 補回遺失的時間格式化函數 (修復未定義錯誤)
+        const formatDateTime = (isoString) => {
+            if (!isoString) return "無紀錄";
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return "無紀錄";
+            
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
 
         const ColorCounter = ({ color, count, onChange }) => (
             <div className={`flex flex-col items-center justify-between p-1.5 rounded-lg ${color.bg} ${color.text} ${color.border || 'border border-transparent'} shadow-sm min-w-[3.5rem]`}>
@@ -102,17 +112,19 @@
             const [lat, setLat] = useState("");
             const [lng, setLng] = useState("");
             const [region, setRegion] = useState("");
-            const [visitDate, setVisitDate] = useState(new Date().toISOString().slice(0, 10)); // 預設今天日期
+            const [visitDate, setVisitDate] = useState(new Date().toISOString().slice(0, 10)); // 預設為今天日期
             const [isDetecting, setIsDetecting] = useState(false);
             const [isSaving, setIsSaving] = useState(false);
-            const [editingVisitId, setEditingVisitId] = useState(null); // 記錄目前正在編輯哪一筆拜訪紀錄
+            const [editingVisitId, setEditingVisitId] = useState(null); // 用來判斷是否處於編輯狀態
             
+            // 折疊狀態控制 (記錄哪些地點被展開)
             const [expandedLocs, setExpandedLocs] = useState(new Set());
+            
             const [records, setRecords] = useState([
                 { id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }
             ]);
 
-            // 讀取本地資料庫 (確保與最初版欄位名稱 pikmin-seedlings 相同)
+            // 讀取本地資料庫 (確保使用正確的原始專屬欄位 pikmin-seedlings)
             useEffect(() => {
                 localforage.config({ name: 'PikminHarvestTracker' });
                 localforage.getItem('pikmin-seedlings').then(saved => {
@@ -169,7 +181,7 @@
                     }
                     setRegion([...new Set(textParts)].join(" ") || "未知地點");
                 } catch (error) {
-                    alert("解析地點失敗，請確認座標。");
+                    alert("解析地點失敗，請確認網路與座標格式。");
                 } finally {
                     setIsDetecting(false);
                 }
@@ -201,9 +213,10 @@
                 }));
             };
 
-            // 儲存或更新紀錄
+            // 儲存與修改非同步寫入
             const handleSave = async () => {
                 if (!lat || !lng || !visitDate) return alert("座標與日期為必填項目！");
+                
                 const hasColors = records.some(r => Object.values(r.colors).some(count => count > 0));
                 if (!hasColors) return alert("請至少填寫一個盆栽的顏色數量！");
 
@@ -214,16 +227,16 @@
                 
                 const newVisit = {
                     id: editingVisitId || Date.now().toString(),
-                    date: visitDate,
+                    date: visitDate, // 純日期 YYYY-MM-DD
                     records: records.map(r => ({ ...r }))
                 };
 
                 if (locIndex >= 0) {
                     if (editingVisitId) {
-                        // 編輯模式：替換原本的拜訪時間紀錄
+                        // 編輯模式下，把該次拜訪紀錄替換掉
                         existingLocs[locIndex].visits = existingLocs[locIndex].visits.map(v => v.id === editingVisitId ? newVisit : v);
                     } else {
-                        // 新增模式
+                        // 一般新增模式
                         existingLocs[locIndex].visits.push(newVisit);
                     }
                     existingLocs[locIndex].visits.sort((a,b) => b.date.localeCompare(a.date));
@@ -241,19 +254,26 @@
                     nextExpanded.add(locKey);
                     setExpandedLocs(nextExpanded);
 
-                    // 重置
+                    // 重置表單
                     setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]);
                     setEditingVisitId(null);
                     setLat(""); setLng(""); setRegion("");
-                    alert("💾 儲存成功！");
+                    
+                    const toast = document.createElement('div');
+                    toast.className = "fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold transition-opacity duration-300";
+                    toast.innerText = "💾 儲存成功！";
+                    document.body.appendChild(toast);
+                    setTimeout(() => { toast.style.opacity = '0'; setTimeout(()=> toast.remove(), 300); }, 2000);
+
                 } catch (e) {
-                    alert("儲存失敗！");
+                    alert("儲存失敗！資料庫可能發生錯誤。");
                 } finally {
+                    setLoading(false);
                     setIsSaving(false);
                 }
             };
 
-            // 進入編輯模式，把右側資料塞回左側表單
+            // 觸發編輯：把右邊舊紀錄回填到左邊輸入框
             const handleEditVisit = (loc, visit) => {
                 setLat(loc.lat);
                 setLng(loc.lng);
@@ -261,10 +281,10 @@
                 setVisitDate(visit.date);
                 setEditingVisitId(visit.id);
                 setRecords(visit.records.map(r => ({ ...r, id: r.id || Date.now() + Math.random() })));
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                window.scrollTo({ top: 0, behavior: 'smooth' }); // 平滑捲動到上方
             };
 
-            // 更新大項目的「目標盆栽種類」
+            // 修改大項目的主要想拿的目標種類
             const handleUpdateTargetCategory = async (key, value) => {
                 const nextLocs = locations.map(l => {
                     if (l.key === key) return { ...l, targetCategory: value };
@@ -289,6 +309,7 @@
                     }
                     return l;
                 }).filter(l => l.visits.length > 0); 
+                
                 setLocations(newLocs);
                 await localforage.setItem('pikmin-seedlings', newLocs);
             };
@@ -299,6 +320,10 @@
                 else next.add(key);
                 setExpandedLocs(next);
             };
+
+            if (isInitialLoading) {
+                return <div className="min-h-screen flex items-center justify-center text-emerald-600 font-bold bg-slate-50"><i className="fas fa-spinner fa-spin mr-2"></i> 正在載入歷史資料庫...</div>;
+            }
 
             return (
                 <div>
@@ -315,7 +340,7 @@
 
                     <main className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         
-                        {/* 左側：表單 */}
+                        {/* 左側表單 */}
                         <div className="lg:col-span-5 space-y-6 sticky top-24 z-10">
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h2 className="text-lg font-black text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
@@ -325,19 +350,25 @@
                                 <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-sm font-bold text-slate-700"><i className="fas fa-map-marker-alt text-emerald-500 mr-1"></i> 1. 地點座標</h3>
-                                        <button onClick={handleDetectLocation} disabled={isDetecting} className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold transition-colors disabled:opacity-50">
+                                        <button onClick={handleDetectLocation} disabled={isDetecting} className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-1">
+                                            {isDetecting ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-magic"></i>}
                                             {isDetecting ? '解析中...' : '解析地點'}
                                         </button>
                                     </div>
                                     <div className="flex gap-2">
-                                        <input type="text" placeholder="緯度 (Lat)" mountaineer="" onPaste={handleCoordinatePaste} value={lat} onChange={e => setLat(e.target.value)} className="w-1/2 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                        <input type="text" placeholder="緯度 (Lat)" onPaste={handleCoordinatePaste} value={lat} onChange={e => setLat(e.target.value)} className="w-1/2 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                         <input type="text" placeholder="經度 (Lng)" onPaste={handleCoordinatePaste} value={lng} onChange={e => setLng(e.target.value)} className="w-1/2 border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                     </div>
-                                    {region && <div className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded inline-block">{region}</div>}
+                                    {region && (
+                                        <div className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded inline-flex items-center gap-1">
+                                            <i className="fas fa-check-circle"></i> {region}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2 mb-6">
                                     <h3 className="text-sm font-bold text-slate-700"><i className="far fa-calendar-alt text-emerald-500 mr-1"></i> 2. 刷盆日期</h3>
+                                    {/* 修改為純日期選擇 */}
                                     <input type="date" value={visitDate} onChange={e => setVisitDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                 </div>
 
@@ -345,7 +376,7 @@
                                     <h3 className="text-sm font-bold text-slate-700"><i className="fas fa-box-open text-emerald-500 mr-1"></i> 3. 獲得盆栽數量</h3>
                                     
                                     {records.map((rec, index) => (
-                                        <div key={rec.id} className="bg-white border-2 border-slate-100 rounded-xl p-4 shadow-sm relative group hover:border-emerald-100">
+                                        <div key={rec.id} className="bg-white border-2 border-slate-100 rounded-xl p-4 shadow-sm relative group hover:border-emerald-100 transition-colors">
                                             {records.length > 1 && (
                                                 <button onClick={() => handleRemoveRecordBlock(rec.id)} className="absolute -top-3 -right-3 bg-white border border-red-200 text-red-500 hover:bg-red-500 hover:text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-sm z-10">
                                                     <i className="fas fa-times"></i>
@@ -356,7 +387,7 @@
                                                 <select value={rec.category} onChange={e => updateRecord(rec.id, 'category', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500">
                                                     {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                 </select>
-                                                {/* 如果是路邊，不顯示子類別選單 */}
+                                                {/* ★ 智慧判斷：如果大類別是路邊，直接藏起子類別選單 */}
                                                 {rec.category !== "路邊" && (
                                                     <select value={rec.subCategory} onChange={e => updateRecord(rec.id, 'subCategory', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500">
                                                         {PIKMIN_CATEGORIES[rec.category].map(sc => <option key={sc} value={sc}>{sc}</option>)}
@@ -384,31 +415,35 @@
 
                                 <div className="flex gap-2">
                                     {editingVisitId && (
-                                        <button onClick={() => { setEditingVisitId(null); setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]); setLat(""); setLng(""); setRegion(""); }} className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl">取消修改</button>
+                                        <button onClick={() => { setEditingVisitId(null); setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]); setLat(""); setLng(""); setRegion(""); }} className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl text-sm">取消修改</button>
                                     )}
-                                    <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg text-lg flex items-center justify-center gap-2 disabled:opacity-50">
+                                    <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-95 text-lg flex items-center justify-center gap-2 disabled:opacity-50">
                                         {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>} 儲存紀錄
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 右側：資料展示區 */}
+                        {/* 右側展示區 */}
                         <div className="lg:col-span-7 space-y-4">
                             {locations.length === 0 ? (
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center text-slate-400">
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center text-slate-400 mt-10 lg:mt-0">
                                     <i className="fas fa-map-marked-alt text-4xl mb-3 opacity-30"></i>
-                                    <p className="font-bold">目前還沒有任何紀錄喔！</p>
+                                    <p className="font-bold">目前還沒有任何紀錄喔！<br/>快從左邊新增你的第一個刷盆地點吧。</p>
                                 </div>
                             ) : (
-                                locations.map(loc => {
+                                locations.sort((a,b) => b.visits[0].date.localeCompare(a.visits[0].date)).map(loc => {
                                     const isExpanded = expandedLocs.has(loc.key);
                                     let totalSeedlings = 0;
-                                    loc.visits.forEach(v => v.records.forEach(r => totalSeedlings += Object.values(r.colors).reduce((sum, c) => sum + c, 0)));
+                                    loc.visits.forEach(v => v.records.forEach(r => totalSeedlings += Object.values(r.colors).reduce((sum, count) => sum + count, 0)));
 
                                     return (
                                         <div key={loc.key} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
-                                            <div className={`px-5 py-4 flex justify-between items-center cursor-pointer select-none ${isExpanded ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`} onClick={() => toggleExpand(loc.key)}>
+                                            {/* 折疊式地點標頭 */}
+                                            <div 
+                                                className={`px-5 py-4 flex justify-between items-center cursor-pointer select-none transition-colors ${isExpanded ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}
+                                                onClick={() => toggleExpand(loc.key)}
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-slate-400 text-xs`}></i>
                                                     <div>
@@ -416,66 +451,76 @@
                                                             <h2 className={`text-lg font-bold flex items-center gap-2 ${isExpanded ? 'text-white' : 'text-slate-800'}`}>
                                                                 <i className="fas fa-map-pin text-emerald-500"></i> {loc.region || "未知地點"}
                                                             </h2>
-                                                            {/* ★ 動態顯示該地點的時區現在時間 */}
+                                                            {/* ★ 動態顯示該地點時區目前的現在時間 */}
                                                             <TargetLocalClock lat={loc.lat} lng={loc.lng} />
                                                         </div>
-                                                        <div className={`text-xs font-mono mt-0.5 ${isExpanded ? 'text-slate-300' : 'text-slate-500'}`}>{loc.lat}, {loc.lng}</div>
+                                                        <div className={`text-xs font-mono mt-0.5 ${isExpanded ? 'text-slate-300 opacity-80' : 'text-slate-500'}`}>{loc.lat}, {loc.lng}</div>
                                                         
-                                                        {/* ★ 目標盆栽種類選擇選單 */}
+                                                        {/* ★ 新增：大格項目旁邊的「目標盆栽種類大類別」選單 */}
                                                         <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                                            <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded">🎯 目標盆栽</span>
+                                                            <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm">🎯 目標大類別</span>
                                                             <select 
                                                                 value={loc.targetCategory || "餐廳"} 
                                                                 onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
-                                                                className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-bold`}
+                                                                className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black`}
                                                             >
                                                                 {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
                                                         </div>
                                                     </div>
                                                 </div>
+                                                
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex flex-col items-end">
                                                         <span className="text-[10px] text-slate-400 font-bold">共 {loc.visits.length} 次拜訪</span>
                                                         <span className={`text-sm font-black ${isExpanded ? 'text-emerald-300' : 'text-emerald-600'}`}>{totalSeedlings} 盆</span>
                                                     </div>
+                                                    
                                                     {isExpanded && (
-                                                        <button className="text-slate-400 hover:text-red-400" onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.key); }}><i className="fas fa-trash-alt text-sm"></i></button>
+                                                        <button className="text-slate-400 hover:text-red-400 hover:bg-white/10 w-8 h-8 rounded-full flex items-center justify-center transition-colors" 
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc.key); }} title="刪除此地點">
+                                                            <i className="fas fa-trash-alt text-sm"></i>
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
 
+                                            {/* 內容展開區塊 */}
                                             {isExpanded && (
                                                 <div className="p-5 space-y-5 bg-slate-50/50">
                                                     {loc.visits.map(visit => (
                                                         <div key={visit.id} className="relative pl-5 border-l-2 border-emerald-200 ml-2">
                                                             <div className="absolute -left-[9px] top-1 bg-emerald-500 w-4 h-4 rounded-full border-4 border-white shadow-sm"></div>
                                                             <div className="flex justify-between items-center mb-2">
-                                                                <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200">
-                                                                    📅 {visit.date}
+                                                                <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200 flex items-center gap-1.5">
+                                                                    <i className="far fa-calendar-alt text-slate-400"></i> {visit.date}
                                                                 </h3>
                                                                 <div className="flex gap-3 text-xs">
-                                                                    {/* ★ 編輯按紐，將資料完整拋回表單 */}
-                                                                    <button className="text-emerald-600 font-black hover:underline" onClick={() => handleEditVisit(loc, visit)}><i className="fas fa-edit mr-1"></i>編輯</button>
-                                                                    <button className="text-slate-400 hover:text-red-500 font-bold" onClick={() => handleDeleteVisit(loc.key, visit.id)}>刪除</button>
+                                                                    {/* ★ 新增：每筆拜訪紀錄的編輯按鈕 */}
+                                                                    <button className="text-emerald-600 font-black hover:underline flex items-center gap-1" onClick={() => handleEditVisit(loc, visit)}>
+                                                                        <i className="fas fa-edit text-[10px]"></i>編輯
+                                                                    </button>
+                                                                    <button className="text-slate-400 hover:text-red-500 font-medium" onClick={() => handleDeleteVisit(loc.key, visit.id)}>刪除</button>
                                                                 </div>
                                                             </div>
+                                                            
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                                                                 {visit.records.map((rec, i) => {
-                                                                    const activeColors = Object.entries(rec.colors).filter(([_,v]) => v > 0);
+                                                                    const activeColors = Object.entries(rec.colors).filter(([k,v]) => v > 0);
                                                                     if (activeColors.length === 0) return null;
+
                                                                     return (
                                                                         <div key={i} className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
-                                                                                <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">{rec.category}</span>
-                                                                                {rec.category !== "路邊" && rec.subCategory !== "其他" && <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{rec.subCategory}</span>}
+                                                                            <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-slate-100">
+                                                                                <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-1 rounded">{rec.category}</span>
+                                                                                {rec.category !== "路邊" && rec.subCategory !== "其他" && <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">{rec.subCategory}</span>}
                                                                             </div>
                                                                             <div className="flex flex-wrap gap-1.5">
                                                                                 {activeColors.map(([colorKey, count]) => {
                                                                                     const c = COLORS.find(col => col.id === colorKey);
                                                                                     return (
-                                                                                        <span key={colorKey} className={`text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${c.bg} ${c.text} ${c.border || ''}`}>
-                                                                                            {c.label} <span className="bg-black/20 px-1.5 rounded-full text-center">{count}</span>
+                                                                                        <span key={colorKey} className={`text-[11px] font-bold px-2 py-1 rounded flex items-center gap-1.5 ${c.bg} ${c.text} ${c.border || ''} shadow-sm`}>
+                                                                                            {c.label} <span className="bg-black/20 px-1.5 rounded-full min-w-[1.2rem] text-center">{count}</span>
                                                                                         </span>
                                                                                     );
                                                                                 })}
