@@ -460,6 +460,7 @@
                                     const isExpanded = expandedLocs.has(loc.key);
                                     let totalSeedlings = 0;
                                     loc.visits.forEach(v => v.records.forEach(r => totalSeedlings += Object.values(r.colors).reduce((sum, count) => sum + count, 0)));
+                                    const currentTarget = loc.targetCategory || "餐廳";
 
                                     return (
                                         <div key={loc.key} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
@@ -483,7 +484,7 @@
                                                             <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm">🎯 目標大類別</span>
                                                             <select 
                                                                 disabled={!isAdmin}
-                                                                value={loc.targetCategory || "餐廳"} 
+                                                                value={currentTarget} 
                                                                 onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
                                                                 className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
                                                             >
@@ -509,50 +510,66 @@
                                             {/* 內容展開區塊 */}
                                             {isExpanded && (
                                                 <div className="p-5 space-y-5 bg-slate-50/50">
-                                                    {loc.visits.map(visit => (
-                                                        <div key={visit.id} className="relative pl-5 border-l-2 border-emerald-200 ml-2">
-                                                            <div className="absolute -left-[9px] top-1 bg-emerald-500 w-4 h-4 rounded-full border-4 border-white shadow-sm"></div>
-                                                            <div className="flex justify-between items-center mb-2">
-                                                                <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200">
-                                                                    📅 {visit.date}
-                                                                </h3>
-                                                                <div className="flex gap-3 text-xs">
-                                                                    {isAdmin && (
-                                                                        <button className="text-emerald-600 font-black hover:underline flex items-center gap-1" onClick={() => handleEditVisit(loc, visit)}>
-                                                                            <i className="fas fa-edit text-[10px]"></i>編輯
-                                                                        </button>
-                                                                    )}
-                                                                    {isAdmin && (
-                                                                        <button className="text-slate-400 hover:text-red-500 font-medium" onClick={() => handleDeleteVisit(loc.key, visit.id)}>刪除</button>
-                                                                    )}
+                                                    {loc.visits.map(visit => {
+                                                        // ★ 新增功能：計算該次拜訪拿到的目標盆栽總數
+                                                        let targetCategoryCount = 0;
+                                                        visit.records.forEach(rec => {
+                                                            if (rec.category === currentTarget) {
+                                                                targetCategoryCount += Object.values(rec.colors).reduce((sum, count) => sum + count, 0);
+                                                            }
+                                                        });
+
+                                                        return (
+                                                            <div key={visit.id} className="relative pl-5 border-l-2 border-emerald-200 ml-2">
+                                                                <div className="absolute -left-[9px] top-1 bg-emerald-500 w-4 h-4 rounded-full border-4 border-white shadow-sm"></div>
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200 flex items-center gap-1.5">
+                                                                            <i className="far fa-calendar-alt text-slate-400"></i> {visit.date}
+                                                                        </h3>
+                                                                        {/* ★ 顯示每次拜訪的目標種類獲得數量 */}
+                                                                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm border border-amber-200">
+                                                                            {currentTarget}: {targetCategoryCount} 盆
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex gap-3 text-xs">
+                                                                        {isAdmin && (
+                                                                            <button className="text-emerald-600 font-black hover:underline flex items-center gap-1" onClick={() => handleEditVisit(loc, visit)}>
+                                                                                <i className="fas fa-edit text-[10px]"></i>編輯
+                                                                            </button>
+                                                                        )}
+                                                                        {isAdmin && (
+                                                                            <button className="text-slate-400 hover:text-red-500 font-medium" onClick={() => handleDeleteVisit(loc.key, visit.id)}>刪除</button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                                                                    {visit.records.map((rec, i) => {
+                                                                        const activeColors = Object.entries(rec.colors).filter(([_,v]) => v > 0);
+                                                                        if (activeColors.length === 0) return null;
+                                                                        return (
+                                                                            <div key={i} className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                                                                                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                                                                                    <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">{rec.category}</span>
+                                                                                    {rec.category !== "路邊" && rec.subCategory !== "其他" && <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{rec.subCategory}</span>}
+                                                                                </div>
+                                                                                <div className="flex flex-wrap gap-1.5">
+                                                                                    {activeColors.map(([colorKey, count]) => {
+                                                                                        const c = COLORS.find(col => col.id === colorKey);
+                                                                                        return (
+                                                                                            <span key={colorKey} className={`text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${c.bg} ${c.text} ${c.border || ''}`}>
+                                                                                                {c.label} <span className="bg-black/20 px-1.5 rounded-full text-center">{count}</span>
+                                                                                            </span>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            </div>
+                                                                        )
+                                                                    })}
                                                                 </div>
                                                             </div>
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                                                                {visit.records.map((rec, i) => {
-                                                                    const activeColors = Object.entries(rec.colors).filter(([_,v]) => v > 0);
-                                                                    if (activeColors.length === 0) return null;
-                                                                    return (
-                                                                        <div key={i} className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
-                                                                                <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">{rec.category}</span>
-                                                                                {rec.category !== "路邊" && rec.subCategory !== "其他" && <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{rec.subCategory}</span>}
-                                                                            </div>
-                                                                            <div className="flex flex-wrap gap-1.5">
-                                                                                {activeColors.map(([colorKey, count]) => {
-                                                                                    const c = COLORS.find(col => col.id === colorKey);
-                                                                                    return (
-                                                                                        <span key={colorKey} className={`text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${c.bg} ${c.text} ${c.border || ''}`}>
-                                                                                            {c.label} <span className="bg-black/20 px-1.5 rounded-full text-center">{count}</span>
-                                                                                        </span>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        </div>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
