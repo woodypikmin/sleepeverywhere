@@ -12,8 +12,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
+        /* 隱藏數字輸入框的上下箭頭 */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        /* 捲動條美化 */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -56,6 +58,15 @@
 
         const getEmptyColors = () => ({ '紅': 0, '黃': 0, '藍': 0, '紫': 0, '白': 0, '粉': 0, '岩': 0, '冰': 0 });
 
+        const formatDateTime = (isoString) => {
+            if (!isoString) return "無紀錄";
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return "無紀錄";
+            
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
         const ColorCounter = ({ color, count, onChange, disabled }) => (
             <div className={`flex flex-col items-center justify-between p-1.5 rounded-lg ${color.bg} ${color.text} ${color.border || ''} shadow-sm min-w-[3.5rem]`}>
                 <span className="text-[11px] font-black mb-1">{color.id}</span>
@@ -84,7 +95,7 @@
                 const id = setInterval(fetchTime, 30000);
                 return () => { isMounted = false; clearInterval(id); };
             }, [lat, lng]);
-            return timeStr ? <span className="text-xs bg-slate-700 text-emerald-300 px-2 py-0.5 rounded font-mono ml-2">當地: {timeStr}</span> : null;
+            return timeStr ? <span className="text-xs bg-slate-700 text-emerald-300 px-2 py-0.5 rounded font-mono ml-2">當地現在: {timeStr}</span> : null;
         };
 
         const App = () => {
@@ -107,7 +118,7 @@
                 { id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }
             ]);
 
-            // ★ 網頁載入時自動從 Google Sheets 抓取歷史資料
+            // 讀取資料庫
             useEffect(() => {
                 localforage.config({ name: 'PikminHarvestTracker' });
                 if (sessionStorage.getItem('pikmin-admin-auth') === 'true') setIsAdmin(true);
@@ -135,11 +146,9 @@
                 }
             }, []);
 
-            // ★ 將資料非同步寫入 Google Sheets (繞過 CORS)
             const syncToCloud = async (dataToSync) => {
                 if (!GOOGLE_SHEETS_API_URL.startsWith("http")) return;
                 try {
-                    // 使用預設設定，不自訂 Headers 以避免 CORS Preflight 阻擋
                     await fetch(GOOGLE_SHEETS_API_URL, {
                         method: "POST",
                         body: JSON.stringify({ action: "sync_all", data: dataToSync })
@@ -265,7 +274,6 @@
                     });
                 }
                 
-                // 本地與雲端同步寫入
                 setLocations(existingLocs);
                 await localforage.setItem('pikmin-seedlings', existingLocs);
                 await syncToCloud(existingLocs);
@@ -465,7 +473,23 @@
                                 locations.sort((a,b) => b.visits[0].date.localeCompare(a.visits[0].date)).map(loc => {
                                     const isExpanded = expandedLocs.has(loc.key);
                                     let totalSeedlings = 0;
-                                    loc.visits.forEach(v => (v.records || []).forEach(r => totalSeedlings += Object.values(r.colors || {}).reduce((sum, count) => sum + count, 0)));
+                                    
+                                    // ★ 預覽區塊：計算此地點歷史總共拿到的所有盆栽種類與顏色總數
+                                    const summaryObj = {};
+                                    loc.visits.forEach(v => {
+                                        (v.records || []).forEach(r => {
+                                            const activeColors = Object.entries(r.colors || {}).filter(([_, count]) => count > 0);
+                                            if (activeColors.length > 0) {
+                                                const catName = r.category !== "路邊" && r.subCategory !== "其他" ? r.subCategory : r.category;
+                                                if (!summaryObj[catName]) summaryObj[catName] = {};
+                                                activeColors.forEach(([color, count]) => {
+                                                    summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
+                                                    totalSeedlings += count;
+                                                });
+                                            }
+                                        });
+                                    });
+
                                     const currentTarget = loc.targetCategory || "餐廳";
                                     const displayName = loc.customName && loc.customName.trim() ? loc.customName.trim() : (loc.region || "未知地點");
                                     const hasCustomName = loc.customName && loc.customName.trim();
@@ -474,11 +498,11 @@
                                         <div key={loc.key} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
                                             {/* 折疊式地點標頭 */}
                                             <div 
-                                                className={`px-5 py-4 flex justify-between items-center cursor-pointer select-none transition-colors ${isExpanded ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}
+                                                className={`px-5 py-4 flex justify-between items-start cursor-pointer select-none transition-colors ${isExpanded ? 'bg-slate-800 text-white' : 'hover:bg-slate-50'}`}
                                                 onClick={() => toggleExpand(loc.key)}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-slate-400 text-xs`}></i>
+                                                <div className="flex gap-3">
+                                                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-slate-400 text-xs mt-1.5`}></i>
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <h2 className={`text-lg font-bold flex items-center gap-2 ${isExpanded ? 'text-white' : 'text-slate-800'}`}>
@@ -493,7 +517,27 @@
                                                         </div>
                                                         <div className={`text-xs font-mono mt-0.5 ${isExpanded ? 'text-slate-300 opacity-80' : 'text-slate-500'}`}>{loc.lat}, {loc.lng}</div>
                                                         
-                                                        {/* 目標大類別選單 */}
+                                                        {/* ★ 新增：地點總收成預覽區塊 (未展開時也看得到) */}
+                                                        {!isExpanded && Object.keys(summaryObj).length > 0 && (
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {Object.entries(summaryObj).map(([cat, colorsObj]) => (
+                                                                    <div key={cat} className="flex items-center text-[11px] bg-slate-100 text-slate-600 rounded-full border border-slate-200 overflow-hidden shadow-sm">
+                                                                        <span className="font-black bg-slate-200 px-2 py-0.5">{cat}</span>
+                                                                        <span className="px-2 flex gap-1">
+                                                                            {Object.entries(colorsObj).map(([c, count]) => {
+                                                                                const colorDef = COLORS.find(col => col.id === c);
+                                                                                return colorDef ? (
+                                                                                    <span key={c} className={`flex items-center gap-0.5 font-bold ${colorDef.bg} ${colorDef.text} ${colorDef.border || ''} px-1 rounded-sm text-[9px]`}>
+                                                                                        {c}{count}
+                                                                                    </span>
+                                                                                ) : null;
+                                                                            })}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
                                                         <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                                                             <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm">🎯 目標大類別</span>
                                                             <select 
@@ -540,7 +584,6 @@
                                                                         <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200 flex items-center gap-1.5">
                                                                             <i className="far fa-calendar-alt text-slate-400"></i> {visit.date}
                                                                         </h3>
-                                                                        {/* ★ 顯示每次拜訪的目標種類獲得數量 */}
                                                                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm border border-amber-200">
                                                                             {currentTarget}: {targetCategoryCount} 盆
                                                                         </span>
