@@ -473,6 +473,8 @@
                                 locations.sort((a,b) => b.visits[0].date.localeCompare(a.visits[0].date)).map(loc => {
                                     const isExpanded = expandedLocs.has(loc.key);
                                     let totalSeedlings = 0;
+                                    let totalTargetCategoryCount = 0; // 計算總計拿到的目標類別總盆數
+                                    const currentTarget = loc.targetCategory || "餐廳";
                                     
                                     // ★ 預覽區塊：計算此地點歷史總共拿到的所有盆栽種類與顏色總數
                                     const summaryObj = {};
@@ -485,12 +487,14 @@
                                                 activeColors.forEach(([color, count]) => {
                                                     summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
                                                     totalSeedlings += count;
+                                                    if(r.category === currentTarget) {
+                                                        totalTargetCategoryCount += count;
+                                                    }
                                                 });
                                             }
                                         });
                                     });
 
-                                    const currentTarget = loc.targetCategory || "餐廳";
                                     const displayName = loc.customName && loc.customName.trim() ? loc.customName.trim() : (loc.region || "未知地點");
                                     const hasCustomName = loc.customName && loc.customName.trim();
 
@@ -548,6 +552,10 @@
                                                             >
                                                                 {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
+                                                            {/* ★ 新增：在目標選單旁直接顯示該目標類別的總盆數 */}
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isExpanded ? 'text-amber-300' : 'text-amber-600'}`}>
+                                                                (已獲取 {totalTargetCategoryCount} 盆)
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
