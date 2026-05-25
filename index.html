@@ -677,16 +677,6 @@
     </script>
 </body>
 </html>
-這版本沒有問題 只是在展開後的日期當中 我想要讓子類別能用這個灰色的分類方式包起來 然後裡面的數字也像原本一樣就好
-
-<span className="font-black bg-slate-200 px-2 py-0.5">{cat}</span>
-<span className="px-2 flex gap-1">
-{Object.entries(colorsObj).map(([c, count]) => {
-const colorDef = COLORS.find(col => col.id === c);
-return colorDef ? (
-<span key={c} className={`flex items-center gap-0.5 font-bold ${colorDef.bg} ${colorDef.text} ${colorDef.border || ''} px-1 rounded-sm text-[9px]`}>
-{c}{count}
-</span>
 比方目標大類是咖啡廳，下面的那個就會自動跳出子類的選單咖啡杯
 當然如果這個沒有子類 他可以就不用跑出第二個選單
 那如果是路邊 這選單也可以不用跑出來
