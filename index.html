@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Bloom 盆栽收成記錄器</title>
+    <title>Pikmin Bloom 盆栽收成記錄器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -34,7 +34,7 @@
         // ★★★ 請把你的網頁應用程式網址貼在這裡 ★★★
         const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwgDoLcjCPHOA3hxj2CEZdXYO2K3lWSZASHg7Z0Yy5N83_82HoNf8MPp9kA6wtiBkwq/exec";
 
-        const _CATEGORIES = {
+        const PIKMIN_CATEGORIES = {
             "餐廳": ["廚師帽子"], "咖啡廳": ["咖啡杯"], "甜點店": ["馬卡龍", "甜甜圈"], "電影院": ["爆米花"],
             "藥局": ["牙刷"], "動物園": ["蒲公英"], "森林": ["鍬形蟲", "橡栗"], "水邊": ["擬餌"],
             "郵局": ["郵票"], "美術館": ["畫框"], "機場": ["飛機玩具"], "車站": ["電車紙模型", "票券"],
@@ -288,7 +288,6 @@
                 
                 setIsSaving(false);
                 
-                // 使用自製吐司提示代替 alert
                 const toast = document.createElement('div');
                 toast.className = "fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold transition-opacity duration-300";
                 toast.innerText = "💾 已儲存並同步至雲端！";
@@ -569,6 +568,7 @@
                                                             </button>
                                                         </div>
                                                         
+                                                        {/* 地點總收成預覽區塊 (未展開時也看得到) */}
                                                         {!isExpanded && Object.keys(summaryObj).length > 0 && (
                                                             <div className="mt-3 flex flex-wrap gap-2">
                                                                 {Object.entries(summaryObj).map(([cat, colorsObj]) => (
@@ -597,10 +597,10 @@
                                                                 onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
                                                                 className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
                                                             >
-                                                                {Object.keys(_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                                                {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
                                                             
-                                                            {/* ★ 新增：如果該類別有子類別，才顯示這第二個選單 */}
+                                                            {/* 如果該類別有子類別，才顯示這第二個選單 */}
                                                             {hasSubCategories && (
                                                                 <select 
                                                                     disabled={!isAdmin}
@@ -609,7 +609,7 @@
                                                                     className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
                                                                 >
                                                                     <option value="全部">全部</option>
-                                                                    {_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                                                                    {PIKMIN_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
                                                                 </select>
                                                             )}
 
@@ -640,7 +640,6 @@
                                                         let visitTargetCount = 0;
                                                         (visit.records || []).forEach(rec => {
                                                             if (rec.category === currentTarget) {
-                                                                // ★ 單次拜訪內，也要根據選單來統計該次拿到的目標數量
                                                                 if (currentSubTarget === "全部" || rec.subCategory === currentSubTarget) {
                                                                     visitTargetCount += Object.values(rec.colors || {}).reduce((sum, count) => sum + count, 0);
                                                                 }
