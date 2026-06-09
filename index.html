@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pikmin 盆栽收成記錄器</title>
+    <title> Bloom 盆栽收成記錄器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -12,8 +12,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
+        /* 隱藏數字輸入框的上下箭頭 */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        /* 捲動條美化 */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -32,7 +34,7 @@
         // ★★★ 請把你的網頁應用程式網址貼在這裡 ★★★
         const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwgDoLcjCPHOA3hxj2CEZdXYO2K3lWSZASHg7Z0Yy5N83_82HoNf8MPp9kA6wtiBkwq/exec";
 
-        const PIKMIN_CATEGORIES = {
+        const _CATEGORIES = {
             "餐廳": ["廚師帽子"], "咖啡廳": ["咖啡杯"], "甜點店": ["馬卡龍", "甜甜圈"], "電影院": ["爆米花"],
             "藥局": ["牙刷"], "動物園": ["蒲公英"], "森林": ["鍬形蟲", "橡栗"], "水邊": ["擬餌"],
             "郵局": ["郵票"], "美術館": ["畫框"], "機場": ["飛機玩具"], "車站": ["電車紙模型", "票券"],
@@ -268,7 +270,7 @@
                     existingLocs[locIndex].customName = customName.trim() || existingLocs[locIndex].customName || "";
                 } else {
                     existingLocs.push({
-                        key: locKey, lat, lng, region, customName: customName.trim(), targetCategory: "餐廳", visits: [newVisit]
+                        key: locKey, lat, lng, region, customName: customName.trim(), targetCategory: "餐廳", targetSubCategory: "全部", visits: [newVisit]
                     });
                 }
                 
@@ -285,7 +287,6 @@
                 setLat(""); setLng(""); setRegion(""); setCustomName("");
                 
                 setIsSaving(false);
-                // alert("💾 已儲存並同步至雲端！");
                 
                 // 使用自製吐司提示代替 alert
                 const toast = document.createElement('div');
@@ -310,7 +311,19 @@
             const handleUpdateTargetCategory = async (key, value) => {
                 if (!isAdmin) return;
                 const nextLocs = locations.map(l => {
-                    if (l.key === key) return { ...l, targetCategory: value };
+                    // 更換大類別時，將子類別自動重置為 "全部"
+                    if (l.key === key) return { ...l, targetCategory: value, targetSubCategory: "全部" };
+                    return l;
+                });
+                setLocations(nextLocs);
+                await localforage.setItem('pikmin-seedlings', nextLocs);
+                await syncToCloud(nextLocs);
+            };
+
+            const handleUpdateTargetSubCategory = async (key, value) => {
+                if (!isAdmin) return;
+                const nextLocs = locations.map(l => {
+                    if (l.key === key) return { ...l, targetSubCategory: value };
                     return l;
                 });
                 setLocations(nextLocs);
@@ -348,12 +361,11 @@
                 setExpandedLocs(next);
             };
             
-            // ★ 新增：複製座標功能
+            // ★ 複製座標功能
             const handleCopyCoords = (e, lat, lng) => {
-                e.stopPropagation(); // 避免點擊到外層的展開/收合事件
+                e.stopPropagation(); 
                 const coordsText = `${lat}, ${lng}`;
                 navigator.clipboard.writeText(coordsText).then(() => {
-                    // 簡單的視覺回饋
                     const btn = e.currentTarget;
                     const originalHTML = btn.innerHTML;
                     btn.innerHTML = '<i class="fas fa-check text-emerald-500"></i>';
@@ -370,7 +382,7 @@
                     <header className="bg-emerald-600 text-white shadow-lg sticky top-0 z-30">
                         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
                             <h1 className="text-xl font-bold flex items-center gap-2">
-                                <i className="fas fa-seedling text-emerald-200"></i> Pikmin 雲端收成記錄器
+                                <i className="fas fa-seedling text-emerald-200"></i> Pikmin Bloom 盆栽收成記錄器
                             </h1>
                             <div className="flex items-center gap-3">
                                 <div className="text-xs opacity-80 bg-black/20 px-3 py-1 rounded-full hidden sm:block">
@@ -492,8 +504,13 @@
                                     const isExpanded = expandedLocs.has(loc.key);
                                     let totalSeedlings = 0;
                                     let totalTargetCategoryCount = 0; 
-                                    const currentTarget = loc.targetCategory || "餐廳";
                                     
+                                    const currentTarget = loc.targetCategory || "餐廳";
+                                    const currentSubTarget = loc.targetSubCategory || "全部";
+                                    
+                                    // 判斷該大類別是否有超過一個的子類別
+                                    const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
+
                                     const summaryObj = {};
                                     loc.visits.forEach(v => {
                                         (v.records || []).forEach(r => {
@@ -501,11 +518,16 @@
                                             if (activeColors.length > 0) {
                                                 const catName = r.category !== "路邊" && r.subCategory !== "其他" ? r.subCategory : r.category;
                                                 if (!summaryObj[catName]) summaryObj[catName] = {};
+                                                
                                                 activeColors.forEach(([color, count]) => {
                                                     summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
                                                     totalSeedlings += count;
+                                                    
+                                                    // ★ 動態計算選擇的大類與子類的目標總數
                                                     if(r.category === currentTarget) {
-                                                        totalTargetCategoryCount += count;
+                                                        if(currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
+                                                            totalTargetCategoryCount += count;
+                                                        }
                                                     }
                                                 });
                                             }
@@ -538,7 +560,6 @@
                                                         </div>
                                                         <div className={`flex items-center text-xs font-mono mt-0.5 ${isExpanded ? 'text-slate-300 opacity-80' : 'text-slate-500'}`}>
                                                             {loc.lat}, {loc.lng}
-                                                            {/* ★ 新增：複製座標按鈕 */}
                                                             <button 
                                                                 onClick={(e) => handleCopyCoords(e, loc.lat, loc.lng)}
                                                                 className={`ml-2 px-1.5 py-0.5 rounded transition-colors ${isExpanded ? 'hover:bg-slate-600 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}
@@ -548,7 +569,6 @@
                                                             </button>
                                                         </div>
                                                         
-                                                        {/* 地點總收成預覽區塊 (未展開時也看得到) */}
                                                         {!isExpanded && Object.keys(summaryObj).length > 0 && (
                                                             <div className="mt-3 flex flex-wrap gap-2">
                                                                 {Object.entries(summaryObj).map(([cat, colorsObj]) => (
@@ -569,7 +589,7 @@
                                                             </div>
                                                         )}
 
-                                                        <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={e => e.stopPropagation()}>
                                                             <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm">🎯 目標大類別</span>
                                                             <select 
                                                                 disabled={!isAdmin}
@@ -577,8 +597,22 @@
                                                                 onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
                                                                 className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
                                                             >
-                                                                {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                                                {Object.keys(_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
+                                                            
+                                                            {/* ★ 新增：如果該類別有子類別，才顯示這第二個選單 */}
+                                                            {hasSubCategories && (
+                                                                <select 
+                                                                    disabled={!isAdmin}
+                                                                    value={currentSubTarget} 
+                                                                    onChange={e => handleUpdateTargetSubCategory(loc.key, e.target.value)}
+                                                                    className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
+                                                                >
+                                                                    <option value="全部">全部</option>
+                                                                    {_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                                                                </select>
+                                                            )}
+
                                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isExpanded ? 'text-amber-300' : 'text-amber-600'}`}>
                                                                 (已獲取 {totalTargetCategoryCount} 盆)
                                                             </span>
@@ -603,10 +637,13 @@
                                             {isExpanded && (
                                                 <div className="p-5 space-y-5 bg-slate-50/50">
                                                     {loc.visits.map(visit => {
-                                                        let targetCategoryCount = 0;
+                                                        let visitTargetCount = 0;
                                                         (visit.records || []).forEach(rec => {
                                                             if (rec.category === currentTarget) {
-                                                                targetCategoryCount += Object.values(rec.colors || {}).reduce((sum, count) => sum + count, 0);
+                                                                // ★ 單次拜訪內，也要根據選單來統計該次拿到的目標數量
+                                                                if (currentSubTarget === "全部" || rec.subCategory === currentSubTarget) {
+                                                                    visitTargetCount += Object.values(rec.colors || {}).reduce((sum, count) => sum + count, 0);
+                                                                }
                                                             }
                                                         });
 
@@ -619,7 +656,7 @@
                                                                             <i className="far fa-calendar-alt text-slate-400"></i> {visit.date}
                                                                         </h3>
                                                                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm border border-amber-200">
-                                                                            {currentTarget}: {targetCategoryCount} 盆
+                                                                            {currentTarget}{currentSubTarget !== "全部" ? ` (${currentSubTarget})` : ""}: {visitTargetCount} 盆
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex gap-3 text-xs">
