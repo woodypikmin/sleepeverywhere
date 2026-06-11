@@ -12,10 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
-        /* 隱藏數字輸入框的上下箭頭 */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        /* 捲動條美化 */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -28,7 +26,6 @@
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo } = React;
 
-        // ★ 管理員登入密碼設定
         const ADMIN_PASSWORD = "admin";
 
         // ★★★ 請把你的網頁應用程式網址貼在這裡 ★★★
@@ -98,12 +95,25 @@
             return timeStr ? <span className="text-xs bg-slate-700 text-emerald-300 px-2 py-0.5 rounded font-mono ml-2">當地現在: {timeStr}</span> : null;
         };
 
+        // ★ 核心修復：解析雲端資料時，自動拆解 "大類別 (子類別)" 的格式
+        const parseLocationData = (dataArray) => {
+            return dataArray.map(loc => {
+                let cat = loc.targetCategory || "餐廳";
+                let sub = loc.targetSubCategory || "全部";
+                
+                if (cat.includes(" (") && cat.endsWith(")")) {
+                    sub = cat.substring(cat.indexOf(" (") + 2, cat.length - 1);
+                    cat = cat.substring(0, cat.indexOf(" ("));
+                }
+                return { ...loc, targetCategory: cat, targetSubCategory: sub };
+            });
+        };
+
         const App = () => {
             const [locations, setLocations] = useState([]);
             const [isInitialLoading, setIsInitialLoading] = useState(true);
             const [isAdmin, setIsAdmin] = useState(false);
             
-            // 表單狀態
             const [lat, setLat] = useState("");
             const [lng, setLng] = useState("");
             const [region, setRegion] = useState("");
@@ -118,7 +128,6 @@
                 { id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }
             ]);
 
-            // 讀取資料庫
             useEffect(() => {
                 localforage.config({ name: 'PikminHarvestTracker' });
                 if (sessionStorage.getItem('pikmin-admin-auth') === 'true') setIsAdmin(true);
@@ -127,31 +136,41 @@
                     fetch(GOOGLE_SHEETS_API_URL)
                         .then(res => res.json())
                         .then(data => {
-                            setLocations(data);
-                            localforage.setItem('pikmin-seedlings', data);
+                            const parsedData = parseLocationData(data);
+                            setLocations(parsedData);
+                            localforage.setItem('pikmin-seedlings', parsedData);
                             setIsInitialLoading(false);
                         })
                         .catch(err => {
                             console.error("雲端讀取失敗，讀取本地備用庫");
                             localforage.getItem('pikmin-seedlings').then(saved => {
-                                if (saved) setLocations(saved);
+                                if (saved) setLocations(parseLocationData(saved));
                                 setIsInitialLoading(false);
                             });
                         });
                 } else {
                     localforage.getItem('pikmin-seedlings').then(saved => {
-                        if (saved) setLocations(saved);
+                        if (saved) setLocations(parseLocationData(saved));
                         setIsInitialLoading(false);
                     });
                 }
             }, []);
 
+            // ★ 核心修復：上傳時，自動把子類別塞入 targetCategory 中
             const syncToCloud = async (dataToSync) => {
                 if (!GOOGLE_SHEETS_API_URL.startsWith("http")) return;
                 try {
+                    const payloadData = dataToSync.map(loc => {
+                        let combined = loc.targetCategory || "餐廳";
+                        if (loc.targetSubCategory && loc.targetSubCategory !== "全部") {
+                            combined += ` (${loc.targetSubCategory})`;
+                        }
+                        return { ...loc, targetCategory: combined };
+                    });
+
                     await fetch(GOOGLE_SHEETS_API_URL, {
                         method: "POST",
-                        body: JSON.stringify({ action: "sync_all", data: dataToSync })
+                        body: JSON.stringify({ action: "sync_all", data: payloadData })
                     });
                 } catch (e) { console.error("雲端寫入失敗", e); }
             };
@@ -310,7 +329,6 @@
             const handleUpdateTargetCategory = async (key, value) => {
                 if (!isAdmin) return;
                 const nextLocs = locations.map(l => {
-                    // 更換大類別時，將子類別自動重置為 "全部"
                     if (l.key === key) return { ...l, targetCategory: value, targetSubCategory: "全部" };
                     return l;
                 });
@@ -360,7 +378,6 @@
                 setExpandedLocs(next);
             };
             
-            // ★ 複製座標功能
             const handleCopyCoords = (e, lat, lng) => {
                 e.stopPropagation(); 
                 const coordsText = `${lat}, ${lng}`;
@@ -506,10 +523,8 @@
                                     
                                     const currentTarget = loc.targetCategory || "餐廳";
                                     const currentSubTarget = loc.targetSubCategory || "全部";
-                                    
-                                    // 判斷該大類別是否有超過一個的子類別
                                     const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
-
+                                    
                                     const summaryObj = {};
                                     loc.visits.forEach(v => {
                                         (v.records || []).forEach(r => {
@@ -517,12 +532,11 @@
                                             if (activeColors.length > 0) {
                                                 const catName = r.category !== "路邊" && r.subCategory !== "其他" ? r.subCategory : r.category;
                                                 if (!summaryObj[catName]) summaryObj[catName] = {};
-                                                
                                                 activeColors.forEach(([color, count]) => {
                                                     summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
                                                     totalSeedlings += count;
                                                     
-                                                    // ★ 動態計算選擇的大類與子類的目標總數
+                                                    // 動態計算目標大類與子類的總數
                                                     if(r.category === currentTarget) {
                                                         if(currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
                                                             totalTargetCategoryCount += count;
@@ -568,7 +582,6 @@
                                                             </button>
                                                         </div>
                                                         
-                                                        {/* 地點總收成預覽區塊 (未展開時也看得到) */}
                                                         {!isExpanded && Object.keys(summaryObj).length > 0 && (
                                                             <div className="mt-3 flex flex-wrap gap-2">
                                                                 {Object.entries(summaryObj).map(([cat, colorsObj]) => (
@@ -600,7 +613,7 @@
                                                                 {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
                                                             
-                                                            {/* 如果該類別有子類別，才顯示這第二個選單 */}
+                                                            {/* ★ 目標子類別選單 */}
                                                             {hasSubCategories && (
                                                                 <select 
                                                                     disabled={!isAdmin}
