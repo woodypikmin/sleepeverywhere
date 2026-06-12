@@ -24,7 +24,7 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
         const ADMIN_PASSWORD = "admin";
 
@@ -55,13 +55,19 @@
 
         const getEmptyColors = () => ({ '紅': 0, '黃': 0, '藍': 0, '紫': 0, '白': 0, '粉': 0, '岩': 0, '冰': 0 });
 
-        const formatDateTime = (isoString) => {
-            if (!isoString) return "無紀錄";
-            const d = new Date(isoString);
-            if (isNaN(d.getTime())) return "無紀錄";
-            
-            const pad = (n) => String(n).padStart(2, '0');
-            return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        // ★ 核心修復：強制把各種奇怪的日期格式轉成乾淨的 YYYY-MM-DD
+        const formatDateOnly = (dateString) => {
+            if (!dateString) return "無紀錄";
+            try {
+                const d = new Date(dateString);
+                if (isNaN(d.getTime())) return dateString; // 如果真的解析失敗，就印出原本的字串
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            } catch (e) {
+                return dateString;
+            }
         };
 
         const ColorCounter = ({ color, count, onChange, disabled }) => (
@@ -95,7 +101,6 @@
             return timeStr ? <span className="text-xs bg-slate-700 text-emerald-300 px-2 py-0.5 rounded font-mono ml-2">當地現在: {timeStr}</span> : null;
         };
 
-        // ★ 核心修復：解析雲端資料時，自動拆解 "大類別 (子類別)" 的格式
         const parseLocationData = (dataArray) => {
             return dataArray.map(loc => {
                 let cat = loc.targetCategory || "餐廳";
@@ -156,7 +161,6 @@
                 }
             }, []);
 
-            // ★ 核心修復：上傳時，自動把子類別塞入 targetCategory 中
             const syncToCloud = async (dataToSync) => {
                 if (!GOOGLE_SHEETS_API_URL.startsWith("http")) return;
                 try {
@@ -320,7 +324,8 @@
                 setLng(loc.lng);
                 setRegion(loc.region);
                 setCustomName(loc.customName || "");
-                setVisitDate(visit.date);
+                // ★ 確保編輯時日期能正確顯示在 <input type="date"> 中
+                setVisitDate(formatDateOnly(visit.date));
                 setEditingVisitId(visit.id);
                 setRecords(visit.records.map(r => ({ ...r, id: r.id || Date.now() + Math.random() })));
                 window.scrollTo({ top: 0, behavior: 'smooth' }); 
@@ -523,8 +528,9 @@
                                     
                                     const currentTarget = loc.targetCategory || "餐廳";
                                     const currentSubTarget = loc.targetSubCategory || "全部";
-                                    const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
                                     
+                                    const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
+
                                     const summaryObj = {};
                                     loc.visits.forEach(v => {
                                         (v.records || []).forEach(r => {
@@ -532,11 +538,11 @@
                                             if (activeColors.length > 0) {
                                                 const catName = r.category !== "路邊" && r.subCategory !== "其他" ? r.subCategory : r.category;
                                                 if (!summaryObj[catName]) summaryObj[catName] = {};
+                                                
                                                 activeColors.forEach(([color, count]) => {
                                                     summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
                                                     totalSeedlings += count;
                                                     
-                                                    // 動態計算目標大類與子類的總數
                                                     if(r.category === currentTarget) {
                                                         if(currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
                                                             totalTargetCategoryCount += count;
@@ -613,7 +619,6 @@
                                                                 {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
                                                             </select>
                                                             
-                                                            {/* ★ 目標子類別選單 */}
                                                             {hasSubCategories && (
                                                                 <select 
                                                                     disabled={!isAdmin}
@@ -665,7 +670,7 @@
                                                                 <div className="flex justify-between items-center mb-2">
                                                                     <div className="flex items-center gap-2">
                                                                         <h3 className="text-xs font-black text-slate-700 bg-white px-3 py-1 rounded shadow-sm border border-slate-200 flex items-center gap-1.5">
-                                                                            <i className="far fa-calendar-alt text-slate-400"></i> {visit.date}
+                                                                            <i className="far fa-calendar-alt text-slate-400"></i> {formatDateOnly(visit.date)}
                                                                         </h3>
                                                                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded shadow-sm border border-amber-200">
                                                                             {currentTarget}{currentSubTarget !== "全部" ? ` (${currentSubTarget})` : ""}: {visitTargetCount} 盆
