@@ -8,6 +8,15 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script>
+        Babel.registerPreset('react-classic', {
+            presets: [
+                [Babel.availablePresets.react, { "runtime": "classic" }]
+            ]
+        });
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -23,7 +32,7 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
+    <script type="text/babel" data-type="module" data-presets="react-classic">
         const { useState, useEffect, useMemo, useCallback } = React;
 
         const ADMIN_PASSWORD = "admin";
@@ -55,12 +64,11 @@
 
         const getEmptyColors = () => ({ '紅': 0, '黃': 0, '藍': 0, '紫': 0, '白': 0, '粉': 0, '岩': 0, '冰': 0 });
 
-        // ★ 核心修復：強制把各種奇怪的日期格式轉成乾淨的 YYYY-MM-DD
         const formatDateOnly = (dateString) => {
             if (!dateString) return "無紀錄";
             try {
                 const d = new Date(dateString);
-                if (isNaN(d.getTime())) return dateString; // 如果真的解析失敗，就印出原本的字串
+                if (isNaN(d.getTime())) return dateString; 
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
@@ -324,7 +332,6 @@
                 setLng(loc.lng);
                 setRegion(loc.region);
                 setCustomName(loc.customName || "");
-                // ★ 確保編輯時日期能正確顯示在 <input type="date"> 中
                 setVisitDate(formatDateOnly(visit.date));
                 setEditingVisitId(visit.id);
                 setRecords(visit.records.map(r => ({ ...r, id: r.id || Date.now() + Math.random() })));
