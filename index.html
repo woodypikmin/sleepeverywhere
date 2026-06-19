@@ -8,6 +8,15 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script>
+        Babel.registerPreset('react-classic', {
+            presets: [
+                [Babel.availablePresets.react, { "runtime": "classic" }]
+            ]
+        });
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -19,13 +28,6 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
-    <script>
-        Babel.registerPreset('react-classic', {
-            presets: [
-                [Babel.availablePresets.react, { "runtime": "classic" }]
-            ]
-        });
-    </script>
 </head>
 <body>
     <div id="root"></div>
@@ -38,7 +40,6 @@
         // ★★★ 請把你的網頁應用程式網址貼在這裡 ★★★
         const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwgDoLcjCPHOA3hxj2CEZdXYO2K3lWSZASHg7Z0Yy5N83_82HoNf8MPp9kA6wtiBkwq/exec";
 
-        // ★ 已將 起司店/起司 改為 文具店/文具
         const PIKMIN_CATEGORIES = {
             "餐廳": ["廚師帽子"], "咖啡廳": ["咖啡杯"], "甜點店": ["馬卡龍", "甜甜圈"], "電影院": ["爆米花"],
             "藥局": ["牙刷"], "動物園": ["蒲公英"], "森林": ["鍬形蟲", "橡栗"], "水邊": ["擬餌"],
@@ -108,6 +109,61 @@
             return timeStr ? <span className="text-xs bg-slate-700 text-emerald-300 px-2 py-0.5 rounded font-mono ml-2">當地現在: {timeStr}</span> : null;
         };
 
+        const cleanCountryName = (rawCountry) => {
+            if (!rawCountry) return "";
+            const parts = String(rawCountry).split(';');
+            let zh = [...parts].reverse().find(p => /[\u4e00-\u9fa5]/.test(p));
+            let result = (zh || parts[parts.length - 1]).trim();
+            const dict = { "臺灣": "台灣", "中華民國": "台灣", "Taiwan": "台灣", "肯尼亚": "肯亞", "意大利": "義大利", "新西兰": "紐西蘭", "澳大利亚": "澳洲", "印度尼西亚": "印尼", "沙特阿拉伯": "沙烏地阿拉伯", "阿联酋": "阿拉伯聯合大公國" };
+            return dict[result] || result;
+        };
+
+        const getTaiwaneseCountryName = (countryCode, fallbackName) => {
+            if (!countryCode) return cleanCountryName(fallbackName);
+            try {
+                const regionNames = new Intl.DisplayNames(['zh-TW'], { type: 'region' });
+                let name = regionNames.of(countryCode.toUpperCase());
+                if (name === "臺灣" || name === "中華民國") return "台灣";
+                return name;
+            } catch (e) {
+                return cleanCountryName(fallbackName);
+            }
+        };
+
+        const parseOsmAddress = (addr) => {
+            if (!addr) return "未知地點";
+            const cCode = addr.country_code;
+            const cName = getTaiwaneseCountryName(cCode, addr.country);
+            
+            const clean = (str) => {
+                if (!str) return "";
+                const parts = String(str).split(';');
+                const zh = [...parts].reverse().find(p => /[\u4e00-\u9fa5]/.test(p));
+                return (zh || parts[parts.length - 1]).trim();
+            };
+
+            let level1 = clean(addr.state || addr.province || addr.city || addr.county);
+            let level2 = clean(addr.city_district || addr.district || addr.suburb || addr.town || addr.village || addr.borough);
+
+            if (!level2 && addr.city && clean(addr.city) !== level1) level2 = clean(addr.city);
+            if (!level2 && addr.county && clean(addr.county) !== level1) level2 = clean(addr.county);
+
+            if (level1 === cName) level1 = "";
+            if (level2 === level1 || level2 === cName) level2 = "";
+
+            let result = [];
+            if (cName === "台灣") {
+                if (level1) result.push(level1);
+                if (level2) result.push(level2);
+            } else {
+                if (cName) result.push(cName);
+                if (level1) result.push(level1);
+                if (level2) result.push(level2);
+            }
+
+            return result.join(" ").trim() || (cName ? cName : "特殊座標(需手動)");
+        };
+
         const parseLocationData = (dataArray) => {
             return dataArray.map(loc => {
                 let cat = loc.targetCategory || "餐廳";
@@ -118,7 +174,6 @@
                     cat = cat.substring(0, cat.indexOf(" ("));
                 }
 
-                // ★ 自動相容與修正舊資料的 起司店 -> 文具店
                 if (cat === "起司店") cat = "文具店";
                 if (sub === "起司") sub = "文具";
 
@@ -156,7 +211,6 @@
                 { id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }
             ]);
 
-            // ★ 新增：全域搜尋狀態
             const [globalFilterCat, setGlobalFilterCat] = useState("全部");
             const [globalFilterSub, setGlobalFilterSub] = useState("全部");
             const [globalFilterColor, setGlobalFilterColor] = useState("全部");
@@ -240,26 +294,35 @@
 
             const handleDetectLocation = async () => {
                 if (!lat || !lng) return alert("請先填寫緯度與經度！");
+                
+                let numLat = parseFloat(lat);
+                let numLng = parseFloat(lng);
+                
+                if (isNaN(numLat) || isNaN(numLng)) return;
+
+                if (Math.abs(numLat) > 90 && Math.abs(numLng) <= 90) {
+                    let temp = numLat;
+                    numLat = numLng;
+                    numLng = temp;
+                    setLat(String(numLat));
+                    setLng(String(numLng));
+                }
+
+                if (numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+                    return alert("無效的座標格式！");
+                }
+
                 setIsDetecting(true);
                 try {
-                    const baseRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}`);
-                    const baseData = await baseRes.json();
-                    const lang = ['TW', 'JP', 'KR'].includes(baseData.countryCode) ? 'zh-tw' : 'en';
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${numLat}&lon=${numLng}&accept-language=zh-TW`);
+                    if (!res.ok) throw new Error("API Limit or Error");
+                    const data = await res.json();
                     
-                    const resGeo = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=${lang}`);
-                    const dataGeo = await resGeo.json();
-                    
-                    let cName = dataGeo.countryName || "";
-                    if (cName === "中華民國" || cName === "Republic of China") cName = "台灣";
-                    let textParts = [];
-                    if (baseData.countryCode === 'TW') {
-                        if (dataGeo.principalSubdivision) textParts.push(dataGeo.principalSubdivision);
-                        if (dataGeo.locality || dataGeo.city) textParts.push(dataGeo.locality || dataGeo.city);
+                    if (data && data.address) {
+                        setRegion(parseOsmAddress(data.address));
                     } else {
-                        if (cName) textParts.push(cName);
-                        if (dataGeo.principalSubdivision && dataGeo.principalSubdivision !== cName) textParts.push(dataGeo.principalSubdivision);
+                        setRegion("未知地點");
                     }
-                    setRegion([...new Set(textParts)].join(" ") || "未知地點");
                 } catch (error) {
                     alert("解析地點失敗，請確認網路與座標格式。");
                 } finally {
@@ -421,7 +484,6 @@
                 });
             };
 
-            // ★ 核心功能：全域搜尋與過濾邏輯
             const filteredLocations = useMemo(() => {
                 if (globalFilterCat === "全部" && globalFilterColor === "全部") {
                     return [...locations].sort((a,b) => b.visits[0].date.localeCompare(a.visits[0].date));
@@ -572,7 +634,6 @@
                         {/* 右側展示區 */}
                         <div className={`${isAdmin ? 'lg:col-span-7' : 'lg:col-span-8'} space-y-4`}>
                             
-                            {/* ★ 新增：全域搜尋過濾器 */}
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
                                 <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                                     <i className="fas fa-search text-emerald-500"></i> 尋找特定盆栽紀錄
@@ -610,33 +671,30 @@
                             ) : (
                                 filteredLocations.map(loc => {
                                     const isExpanded = expandedLocs.has(loc.key);
-                                    let totalSeedlings = 0;
-                                    let totalTargetCategoryCount = 0; 
                                     
                                     const currentTarget = loc.targetCategory || "餐廳";
                                     const currentSubTarget = loc.targetSubCategory || "全部";
-                                    
                                     const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
 
-                                    const summaryObj = {};
+                                    // ★ 核心修改：只統計「目標大類別與子類別」的盆栽與顏色
+                                    const targetColorsObj = {};
+                                    let totalTargetCategoryCount = 0;
+                                    let totalSeedlings = 0;
+
                                     loc.visits.forEach(v => {
                                         (v.records || []).forEach(r => {
                                             const activeColors = Object.entries(r.colors || {}).filter(([_, count]) => count > 0);
-                                            if (activeColors.length > 0) {
-                                                const catName = r.category !== "路邊" && r.subCategory !== "其他" ? r.subCategory : r.category;
-                                                if (!summaryObj[catName]) summaryObj[catName] = {};
+                                            
+                                            activeColors.forEach(([color, count]) => {
+                                                totalSeedlings += count;
                                                 
-                                                activeColors.forEach(([color, count]) => {
-                                                    summaryObj[catName][color] = (summaryObj[catName][color] || 0) + count;
-                                                    totalSeedlings += count;
-                                                    
-                                                    if(r.category === currentTarget) {
-                                                        if(currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
-                                                            totalTargetCategoryCount += count;
-                                                        }
+                                                if (r.category === currentTarget) {
+                                                    if (currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
+                                                        targetColorsObj[color] = (targetColorsObj[color] || 0) + count;
+                                                        totalTargetCategoryCount += count;
                                                     }
-                                                });
-                                            }
+                                                }
+                                            });
                                         });
                                     });
 
@@ -689,57 +747,50 @@
                                                             </button>
                                                         </div>
                                                         
-                                                        {/* ★ 核心修改：無論是否展開，皆在卡片直接顯示所有取得的盆栽統計 (符合訪客查看需求) */}
-                                                        {Object.keys(summaryObj).length > 0 && (
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                {Object.entries(summaryObj).map(([cat, colorsObj]) => (
-                                                                    <div key={cat} className={`flex items-center text-[11px] rounded-full border overflow-hidden shadow-sm ${isExpanded ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
-                                                                        <span className={`font-black px-2 py-0.5 ${isExpanded ? 'bg-slate-600' : 'bg-slate-200'}`}>{cat}</span>
-                                                                        <span className="px-2 flex gap-1">
-                                                                            {Object.entries(colorsObj).map(([c, count]) => {
-                                                                                const colorDef = COLORS.find(col => col.id === c);
-                                                                                return colorDef ? (
-                                                                                    <span key={c} className={`flex items-center gap-0.5 font-bold ${colorDef.bg} ${colorDef.text} ${colorDef.border || ''} px-1 rounded-sm text-[9px]`}>
-                                                                                        {c}{count}
-                                                                                    </span>
-                                                                                ) : null;
-                                                                            })}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {/* ★ 管理員專用的地點目標設定 */}
-                                                        {isAdmin && (
-                                                            <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                                                <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm">🎯 目標大類別</span>
+                                                        {/* ★ 核心修改：目標與進度展示 (所有人皆可見) */}
+                                                        <div className={`mt-3 pt-3 flex flex-wrap items-center gap-1.5 border-t ${isExpanded ? 'border-slate-700' : 'border-emerald-100/50'}`} onClick={e => e.stopPropagation()}>
+                                                            <span className={`text-[10px] text-white font-extrabold px-1.5 py-0.5 rounded shadow-sm ${isExpanded ? 'bg-emerald-600' : 'bg-emerald-500'}`}>🎯 目標盆栽</span>
+                                                            <select 
+                                                                disabled={!isAdmin}
+                                                                value={currentTarget} 
+                                                                onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
+                                                                className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
+                                                            >
+                                                                {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                                            </select>
+                                                            
+                                                            {hasSubCategories && (
                                                                 <select 
                                                                     disabled={!isAdmin}
-                                                                    value={currentTarget} 
-                                                                    onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
+                                                                    value={currentSubTarget} 
+                                                                    onChange={e => handleUpdateTargetSubCategory(loc.key, e.target.value)}
                                                                     className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
                                                                 >
-                                                                    {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                                                    <option value="全部">全部</option>
+                                                                    {PIKMIN_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
                                                                 </select>
-                                                                
-                                                                {hasSubCategories && (
-                                                                    <select 
-                                                                        disabled={!isAdmin}
-                                                                        value={currentSubTarget} 
-                                                                        onChange={e => handleUpdateTargetSubCategory(loc.key, e.target.value)}
-                                                                        className={`text-xs rounded px-1.5 py-0.5 border ${isExpanded ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-100 border-slate-200 text-slate-700'} outline-none font-black disabled:opacity-90`}
-                                                                    >
-                                                                        <option value="全部">全部</option>
-                                                                        {PIKMIN_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
-                                                                    </select>
-                                                                )}
+                                                            )}
 
-                                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isExpanded ? 'text-amber-300' : 'text-amber-600'}`}>
-                                                                    (已獲取 {totalTargetCategoryCount} 盆)
+                                                            {Object.keys(targetColorsObj).length > 0 ? (
+                                                                <div className={`flex items-center text-[11px] rounded-full border overflow-hidden shadow-sm ml-auto ${isExpanded ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+                                                                    <span className={`font-black px-2 py-0.5 ${isExpanded ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>進度</span>
+                                                                    <span className="px-1.5 flex gap-1 py-0.5 bg-white">
+                                                                        {Object.entries(targetColorsObj).map(([c, count]) => {
+                                                                            const colorDef = COLORS.find(col => col.id === c);
+                                                                            return colorDef ? (
+                                                                                <span key={c} className={`flex items-center gap-0.5 font-bold ${colorDef.bg} ${colorDef.text} ${colorDef.border || ''} px-1 rounded-sm text-[9px]`}>
+                                                                                    {c}{count}
+                                                                                </span>
+                                                                            ) : null;
+                                                                        })}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto ${isExpanded ? 'text-slate-400' : 'text-slate-400'}`}>
+                                                                    (尚無進度)
                                                                 </span>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
