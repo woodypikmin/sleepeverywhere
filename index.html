@@ -20,14 +20,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; }
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; border: 2px solid #f8fafc; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        
+        /* 獨立滾動條的微調樣式 */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #a7f3d0; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #34d399; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 min-h-screen text-slate-800">
@@ -522,7 +527,7 @@
 
             if (isInitialLoading) {
                 return (
-                    <div className="min-h-screen flex flex-col items-center justify-center text-emerald-600 font-bold">
+                    <div className="min-h-screen flex flex-col items-center justify-center text-emerald-600 font-bold bg-slate-50">
                         <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-4"></div>
                         <p className="animate-pulse tracking-widest">正在連線讀取圖鑑資料...</p>
                     </div>
@@ -542,7 +547,7 @@
                                 </div>
                                 <button 
                                     onClick={handleAdminToggle} 
-                                    className={`px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 ${isAdmin ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 hover:from-amber-400 hover:to-yellow-600 shadow-yellow-500/20' : 'bg-white/10 hover:bg-white/25 text-white backdrop-blur-md border border-white/20'}`}
+                                    className={`px-4 py-2 rounded-xl font-black text-xs shadow-md transition-all flex items-center gap-1.5 ${isAdmin ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 hover:from-amber-400 hover:to-yellow-600 shadow-yellow-500/20' : 'bg-white/10 hover:bg-white/25 text-white backdrop-blur-md border border-white/20'}`}
                                 >
                                     <i className={`fas ${isAdmin ? 'fa-lock-open' : 'fa-lock'}`}></i>
                                     {isAdmin ? '管理員模式' : '訪客模式(唯讀)'}
@@ -555,7 +560,7 @@
                         
                         {/* 左側表單：僅在管理員登入下顯示 */}
                         {isAdmin ? (
-                            <div className="lg:col-span-5 lg:sticky lg:top-24 z-10 lg:max-h-[calc(100vh-6rem)] overflow-y-auto lg:pr-2 pb-4">
+                            <div className="lg:col-span-5 lg:sticky lg:top-24 z-10 lg:max-h-[calc(100vh-6rem)] overflow-y-auto lg:pr-2 pb-4 custom-scroll">
                                 <div className="glass-panel rounded-3xl shadow-xl shadow-emerald-200/40 border border-emerald-100 p-6 relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-400"></div>
                                     <h2 className="text-xl font-bold text-emerald-800 mb-5 pb-3 border-b border-emerald-100 flex items-center gap-2">
@@ -575,7 +580,7 @@
                                         </div>
                                         {region && <div className="text-xs font-bold text-teal-800 bg-teal-100 px-2.5 py-1.5 rounded-md inline-block shadow-sm">辨識地區：{region}</div>}
                                         <div className="pt-3 border-t border-slate-200/60 mt-1">
-                                            <label className="block text-xs font-bold text-slate-500 mb-1.5">自訂地點名稱（可留空）</label>
+                                            <label className="block text-xs font-black text-slate-500 mb-1.5">自訂地點名稱（可留空）</label>
                                             <input type="text" placeholder="例如：家附近公園、公司旁咖啡廳" value={customName} onChange={e => setCustomName(e.target.value)} className="w-full border-0 shadow-inner rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-400 outline-none bg-white" />
                                         </div>
                                     </div>
@@ -621,16 +626,16 @@
                                             </div>
                                         ))}
 
-                                        <button onClick={handleAddRecordBlock} className="w-full py-3 border-2 border-dashed border-emerald-300 text-emerald-600 hover:bg-emerald-50 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-colors">
+                                        <button onClick={handleAddRecordBlock} className="w-full py-3 border-2 border-dashed border-emerald-300 text-emerald-600 hover:bg-emerald-50 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-colors">
                                             <i className="fas fa-plus-circle text-lg"></i> 加入另一個盆栽類別
                                         </button>
                                     </div>
 
                                     <div className="flex gap-3 pt-2">
                                         {editingVisitId && (
-                                            <button onClick={() => { setEditingVisitId(null); setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]); setLat(""); setLng(""); setRegion(""); setCustomName(""); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 rounded-2xl text-sm transition-colors">取消修改</button>
+                                            <button onClick={() => { setEditingVisitId(null); setRecords([{ id: Date.now(), category: "餐廳", subCategory: "廚師帽子", colors: getEmptyColors() }]); setLat(""); setLng(""); setRegion(""); setCustomName(""); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-3.5 rounded-2xl text-sm transition-colors">取消修改</button>
                                         )}
-                                        <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 text-base flex items-center justify-center gap-2 disabled:opacity-50">
+                                        <button onClick={handleSave} disabled={isSaving} className="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 text-base flex items-center justify-center gap-2 disabled:opacity-50">
                                             {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-cloud-upload-alt"></i>} 儲存並同步
                                         </button>
                                     </div>
@@ -655,4 +660,273 @@
                                 <div className="flex flex-wrap gap-4">
                                     <div className="flex-1 min-w-[140px]">
                                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">目標大類別</label>
-                                        <select value
+                                        <select value={globalFilterCat} onChange={e => {setGlobalFilterCat(e.target.value); setGlobalFilterSub("全部");}} className="w-full border-0 bg-slate-100 shadow-inner rounded-xl p-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none cursor-pointer transition-shadow">
+                                            <option value="全部">🌏 全部大類</option>
+                                            {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1 min-w-[140px]">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">專屬子類別</label>
+                                        <select disabled={globalFilterCat === "全部"} value={globalFilterSub} onChange={e => setGlobalFilterSub(e.target.value)} className="w-full border-0 bg-slate-100 shadow-inner rounded-xl p-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none disabled:opacity-50 cursor-pointer transition-shadow">
+                                            <option value="全部">✨ 全部子類</option>
+                                            {globalFilterCat !== "全部" && PIKMIN_CATEGORIES[globalFilterCat].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1 min-w-[140px]">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">特定顏色</label>
+                                        <select value={globalFilterColor} onChange={e => setGlobalFilterColor(e.target.value)} className="w-full border-0 bg-slate-100 shadow-inner rounded-xl p-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none cursor-pointer transition-shadow">
+                                            <option value="全部">🎨 全部顏色</option>
+                                            {COLORS.map(c => <option key={c.id} value={c.id}>{c.id}色盆栽</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {filteredLocations.length === 0 ? (
+                                <div className="glass-panel rounded-3xl shadow-sm border border-emerald-100 p-12 text-center text-slate-400 mt-10 lg:mt-0 flex flex-col items-center">
+                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                                        <i className="fas fa-search text-3xl text-emerald-200"></i>
+                                    </div>
+                                    <p className="font-bold text-lg text-slate-500">找不到符合條件的地點紀錄</p>
+                                    <p className="text-xs mt-2 opacity-70">試著調整上方的過濾條件吧！</p>
+                                </div>
+                            ) : (
+                                filteredLocations.map(loc => {
+                                    const isExpanded = expandedLocs.has(loc.key);
+                                    
+                                    const currentTarget = loc.targetCategory || "餐廳";
+                                    const currentSubTarget = loc.targetSubCategory || "全部";
+                                    const hasSubCategories = PIKMIN_CATEGORIES[currentTarget] && PIKMIN_CATEGORIES[currentTarget].length > 1;
+
+                                    const targetColorsObj = {};
+                                    let totalTargetCategoryCount = 0;
+                                    let totalSeedlings = 0;
+                                    
+                                    const historicalCategoriesSet = new Set();
+
+                                    loc.visits.forEach(v => {
+                                        (v.records || []).forEach(r => {
+                                            const activeColors = Object.entries(r.colors || {}).filter(([_, count]) => count > 0);
+                                            
+                                            if (activeColors.length > 0) {
+                                                if (r.category === "路邊" || r.category === "其他") {
+                                                    historicalCategoriesSet.add(r.category);
+                                                } else {
+                                                    historicalCategoriesSet.add(`${r.category}(${r.subCategory})`);
+                                                }
+                                            }
+
+                                            activeColors.forEach(([color, count]) => {
+                                                totalSeedlings += count;
+                                                
+                                                if (r.category === currentTarget) {
+                                                    if (currentSubTarget === "全部" || r.subCategory === currentSubTarget) {
+                                                        targetColorsObj[color] = (targetColorsObj[color] || 0) + count;
+                                                        totalTargetCategoryCount += count;
+                                                    }
+                                                }
+                                            });
+                                        });
+                                    });
+
+                                    const historicalTags = Array.from(historicalCategoriesSet);
+                                    const displayName = loc.customName && loc.customName.trim() ? loc.customName.trim() : (loc.region || "未知地點");
+                                    const hasCustomName = loc.customName && loc.customName.trim();
+
+                                    return (
+                                        <div key={loc.key} className="glass-panel rounded-3xl shadow-sm border border-emerald-100/60 overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-emerald-200/30 hover:-translate-y-1">
+                                            {/* 折疊式地點標頭 */}
+                                            <div 
+                                                className={`px-5 py-4 flex flex-col cursor-pointer select-none transition-all duration-300 ${isExpanded ? 'bg-gradient-to-r from-slate-800 to-slate-700 text-white shadow-md' : 'hover:bg-emerald-50/50'}`}
+                                                onClick={() => toggleExpand(loc.key)}
+                                            >
+                                                <div className="flex items-start justify-between gap-3 w-full">
+                                                    <div className="flex-1 min-w-0 pr-2">
+                                                        <h2 className={`text-lg font-bold flex items-center gap-2 truncate ${isExpanded ? 'text-white' : 'text-slate-800'}`}>
+                                                            <i className={`fas fa-map-pin shrink-0 ${isExpanded ? 'text-emerald-400 drop-shadow-md' : 'text-emerald-500'}`}></i> 
+                                                            <span className="truncate">{displayName}</span>
+                                                        </h2>
+                                                        {hasCustomName && (
+                                                            <div className={`text-xs mt-1.5 truncate font-bold ${isExpanded ? 'text-slate-300' : 'text-slate-500'}`}>
+                                                                {loc.region || "未知地點"}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-col items-end shrink-0 pt-1">
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isExpanded ? 'text-slate-300' : 'text-slate-400'}`}>共 {loc.visits.length} 訪</span>
+                                                        <span className={`text-sm font-bold ${isExpanded ? 'text-emerald-300 drop-shadow-sm' : 'text-emerald-600'}`}>{totalSeedlings} 盆</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className={`flex items-center justify-between mt-2 pt-2 border-t ${isExpanded ? 'border-slate-600/50' : 'border-slate-200/60'}`}>
+                                                    <div className={`flex items-center text-[11px] font-mono font-bold ${isExpanded ? 'text-emerald-100/70' : 'text-slate-500'}`}>
+                                                        {loc.lat}, {loc.lng}
+                                                        <button 
+                                                            onClick={(e) => handleCopyCoords(e, loc.lat, loc.lng)}
+                                                            className={`ml-1.5 px-2 py-0.5 rounded transition-colors shadow-sm ${isExpanded ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'}`}
+                                                            title="複製座標"
+                                                        >
+                                                            <i className="far fa-copy"></i>
+                                                        </button>
+                                                    </div>
+                                                    <TargetLocalClock lat={loc.lat} lng={loc.lng} isExpanded={isExpanded} />
+                                                </div>
+
+                                                {/* 歷史出現總覽 */}
+                                                {!isExpanded && historicalTags.length > 0 && (
+                                                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                                                        <span className={`text-[10px] font-bold ${isExpanded ? 'text-slate-400' : 'text-slate-400'} flex items-center gap-1`}>
+                                                            <i className="fas fa-history"></i> 歷史出現：
+                                                        </span>
+                                                        {historicalTags.map((tag, idx) => (
+                                                            <span key={idx} className={`text-[9px] px-1.5 py-0.5 rounded border shadow-sm font-bold ${isExpanded ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                
+                                                {/* 目標與進度展示 */}
+                                                <div className={`mt-3 pt-3 flex flex-wrap items-center gap-2 border-t ${isExpanded ? 'border-slate-600' : 'border-emerald-100/60'}`} onClick={e => e.stopPropagation()}>
+                                                    <span className={`text-[10px] text-white font-bold px-2 py-1 rounded-md shadow-sm ${isExpanded ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}>🎯 目標盆栽</span>
+                                                    <select 
+                                                        disabled={!isAdmin}
+                                                        value={currentTarget} 
+                                                        onChange={e => handleUpdateTargetCategory(loc.key, e.target.value)}
+                                                        className={`text-xs rounded-md px-2 py-1 shadow-sm outline-none font-bold transition-colors ${isExpanded ? 'bg-slate-700 border border-slate-600 text-white focus:ring-1 focus:ring-emerald-400' : 'bg-white border border-slate-200 text-slate-700 focus:ring-1 focus:ring-emerald-400'} ${!isAdmin && 'appearance-none pl-1'}`}
+                                                    >
+                                                        {Object.keys(PIKMIN_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+                                                    </select>
+                                                    
+                                                    {hasSubCategories && (
+                                                        <select 
+                                                            disabled={!isAdmin}
+                                                            value={currentSubTarget} 
+                                                            onChange={e => handleUpdateTargetSubCategory(loc.key, e.target.value)}
+                                                            className={`text-xs rounded-md px-2 py-1 shadow-sm outline-none font-bold transition-colors ${isExpanded ? 'bg-slate-700 border border-slate-600 text-white focus:ring-1 focus:ring-emerald-400' : 'bg-white border border-slate-200 text-slate-700 focus:ring-1 focus:ring-emerald-400'} ${!isAdmin && 'appearance-none pl-1'}`}
+                                                        >
+                                                            <option value="全部">全部子類</option>
+                                                            {PIKMIN_CATEGORIES[currentTarget].map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                                                        </select>
+                                                    )}
+
+                                                    {Object.keys(targetColorsObj).length > 0 ? (
+                                                        <div className={`flex items-center text-[11px] rounded-lg border overflow-hidden shadow-sm ml-auto ${isExpanded ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                                                            <span className={`font-bold px-2.5 py-1 ${isExpanded ? 'bg-slate-700 text-emerald-300' : 'bg-slate-100 text-emerald-700'}`}>進度</span>
+                                                            <span className={`px-2 flex gap-1.5 py-1 ${isExpanded ? 'bg-slate-800' : 'bg-white'}`}>
+                                                                {Object.entries(targetColorsObj).map(([c, count]) => {
+                                                                    const colorDef = COLORS.find(col => col.id === c);
+                                                                    return colorDef ? (
+                                                                        <span key={c} className={`flex items-center gap-1 font-bold ${colorDef.bg} ${colorDef.text} ${colorDef.border || ''} px-1.5 rounded text-[10px] shadow-sm`}>
+                                                                            {c}{count}
+                                                                        </span>
+                                                                    ) : null;
+                                                                })}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md ml-auto ${isExpanded ? 'text-slate-400 bg-slate-700' : 'text-slate-400 bg-slate-100'}`}>
+                                                            (尚無該目標紀錄)
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="w-full flex justify-center mt-2">
+                                                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} ${isExpanded ? 'text-emerald-400/50' : 'text-slate-300'} text-xs transition-transform duration-300`}></i>
+                                                </div>
+                                            </div>
+
+                                            {/* 內容展開區塊 */}
+                                            {isExpanded && (
+                                                <div className="p-6 space-y-6 bg-slate-50/80 border-t border-slate-200/60 rounded-b-3xl">
+                                                    {loc.visits.map(visit => {
+                                                        let visitTargetCount = 0;
+                                                        let visitTotalSeedlings = 0;
+                                                        
+                                                        (visit.records || []).forEach(rec => {
+                                                            const recCount = Object.values(rec.colors || {}).reduce((sum, count) => sum + count, 0);
+                                                            visitTotalSeedlings += recCount;
+                                                            
+                                                            if (rec.category === currentTarget) {
+                                                                if (currentSubTarget === "全部" || rec.subCategory === currentSubTarget) {
+                                                                    visitTargetCount += recCount;
+                                                                }
+                                                            }
+                                                        });
+
+                                                        return (
+                                                            <div key={visit.id} className="relative pl-6 border-l-[3px] border-emerald-200 ml-2">
+                                                                <div className="absolute -left-[10.5px] top-0 bg-gradient-to-br from-emerald-400 to-teal-500 w-5 h-5 rounded-full border-[3px] border-white shadow-md"></div>
+                                                                <div className="flex justify-between items-center mb-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="text-xs font-bold text-emerald-800 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-emerald-100 flex items-center gap-1.5">
+                                                                            <i className="far fa-calendar-alt text-emerald-500"></i> {formatDateOnly(visit.date)}
+                                                                            <span className="ml-1 text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">總計 {visitTotalSeedlings} 盆</span>
+                                                                        </h3>
+                                                                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg shadow-sm border border-amber-200/60 flex items-center gap-1">
+                                                                            <i className="fas fa-bullseye opacity-50"></i>
+                                                                            {currentTarget}{currentSubTarget !== "全部" ? ` (${currentSubTarget})` : ""}: {visitTargetCount} 盆
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex gap-2 text-xs">
+                                                                        {isAdmin && (
+                                                                            <button className="text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1.5 shadow-sm" onClick={() => handleEditVisit(loc, visit)}>
+                                                                                <i className="fas fa-edit text-[10px]"></i> 編輯
+                                                                            </button>
+                                                                        )}
+                                                                        {isAdmin && (
+                                                                            <button className="text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold transition-colors shadow-sm" onClick={() => handleDeleteVisit(loc.key, visit.id)}>刪除</button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                                                                    {(visit.records || []).map((rec, i) => {
+                                                                        const activeColors = Object.entries(rec.colors || {}).filter(([_,v]) => v > 0);
+                                                                        if (activeColors.length === 0) return null;
+                                                                        
+                                                                        const recTotal = activeColors.reduce((sum, [_, count]) => sum + count, 0);
+
+                                                                        return (
+                                                                            <div key={i} className="bg-white border border-slate-200/80 p-3.5 rounded-2xl shadow-sm hover:border-emerald-200 transition-colors">
+                                                                                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md">{rec.category}</span>
+                                                                                        {rec.category !== "路邊" && rec.subCategory !== "其他" && <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">{rec.subCategory}</span>}
+                                                                                    </div>
+                                                                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">{recTotal} 盆</span>
+                                                                                </div>
+                                                                                <div className="flex flex-wrap gap-2">
+                                                                                    {activeColors.map(([colorKey, count]) => {
+                                                                                        const c = COLORS.find(col => col.id === colorKey);
+                                                                                        return c ? (
+                                                                                            <span key={colorKey} className={`text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 ${c.bg} ${c.text} ${c.border || ''} shadow-sm`}>
+                                                                                                {c.id} <span className="bg-black/15 px-1.5 py-[1px] rounded min-w-[1.2rem] text-center backdrop-blur-sm">{count}</span>
+                                                                                            </span>
+                                                                                        ) : null;
+                                                                                    })}
+                                                                                </div>
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
